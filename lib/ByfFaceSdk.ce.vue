@@ -102,6 +102,15 @@ onMounted(async () => {
 	await PromiseAll
 	startVideo()
 })
+// function download(url) {
+// 	const name = new Date().toISOString()
+// 	const a = document.createElement('a')
+// 	a.style.display = 'none'
+// 	a.download = `${name}.mp4`
+// 	a.href = url
+// 	document.body.appendChild(a)
+// 	a.click()
+// }
 
 function startVideo() {
 	navigator.mediaDevices
@@ -122,15 +131,6 @@ function startVideo() {
 				if (props.DEV) {
 					let videoUrl = window.URL.createObjectURL(e.data)
 					testVideo.value.src = videoUrl
-					// function download(url) {
-					// 	const name = new Date().toISOString()
-					// 	const a = document.createElement('a')
-					// 	a.style.display = 'none'
-					// 	a.download = `${name}.mp4`
-					// 	a.href = url
-					// 	document.body.appendChild(a)
-					// 	a.click()
-					// }
 					// download(videoUrl)
 				}
 				const again = await props.onMediaRecorderStop({
@@ -178,17 +178,22 @@ const videoOntimeupdate = async () => {
 	canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 	if (props.DEV) {
 		resizedDetections.length !== 0 && console.log(resizedDetections)
-		faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
+		// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
 		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
 	}
 	if (resizedDetections.length === 0) {
 		getState(props.undetected)
 	} else if (resizedDetections.length === 1) {
-		const detection = resizedDetections[0].detection
-		console.log(detection)
-		if (detection.box.width <= 110) {
+		const landmarks = resizedDetections[0].landmarks
+		// console.log(landmarks.getJawOutline())
+		const jawOutline = landmarks.getJawOutline()
+		const jawOutlineFirst = jawOutline[0]
+		const jawOutlineEnd = jawOutline[jawOutline.length - 1]
+		const difference = jawOutlineEnd.x - jawOutlineFirst.x
+		console.log(difference)
+		if (difference <= 80) {
 			getState(props.tooFar)
-		} else if (detection.box.width >= 200) {
+		} else if (difference >= 150) {
 			getState(props.tooClose)
 		} else {
 			getState(props.detected)
@@ -281,95 +286,80 @@ function mediaRecorderStop() {
 </script>
 <template>
 	<div class="byf-face-sdk">
-		<div
-			class="byf-face-sdk-title"
-			v-html="titleHtml"></div>
-		<div
-			class="byf-face-sdk-main"
-			ref="main">
-			<video
-				@playing="videoOnplaying"
-				@timeupdate="videoOntimeupdate"
-				@pause="videoOnpaused"
-				ref="video"
-				playsInline
-				id="video"
-				:width="videoSize"
-				:height="videoSize"
-				autoPlay
-				muted />
+		<div class="byf-face-sdk-title" v-html="titleHtml"></div>
+		<div class="byf-face-sdk-main" ref="main">
+			<video @playing="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video" playsInline
+				id="video" :width="videoSize" :height="videoSize" autoPlay muted />
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
 		</div>
 		<div class="msg-box">
 			{{
-				recordingEnd ? endMsg : canStart ? actionList[activeIndex].label : ''
+					recordingEnd ? endMsg : canStart ? actionList[activeIndex].label : ''
 			}}
 		</div>
 		<div>
-			<button
-				ref="playBut"
-				v-show="playButShow"
-				@click="onButClick"
-				id="play-but">
+			<button ref="playBut" v-show="playButShow" @click="onButClick" id="play-but">
 				{{ beginButText }}
 			</button>
 			<!-- <button @click="mediaRecorderStop">停止</button> -->
 		</div>
-		<video
-			v-if="DEV"
-			controls
-			playsInline
-			ref="testVideo"
-			:width="videoSize"
-			:height="videoSize"
-			autoPlay
-			muted />
+		<video v-if="DEV" controls playsInline ref="testVideo" :width="videoSize" :height="videoSize" autoPlay muted />
 	</div>
 </template>
 <style lang="less">
 .byf-face-sdk {
 	text-align: center;
 	overflow: auto;
+
 	canvas {
 		position: absolute;
 		top: 0;
 		left: 50%;
 		transform: translateX(-50%);
 	}
+
 	video {
 		object-fit: cover;
 	}
+
 	.byf-face-sdk-main {
 		position: relative;
 		margin: 0 auto;
 	}
+
 	.byf-face-sdk-title {
 		height: 100px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
+
 	.img-box {
 		width: 180px;
+
 		img {
 			width: 100%;
 		}
+
 		position: absolute;
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
 	}
+
 	.play-but {
 		display: none;
 	}
+
 	.msg-box {
 		height: 50px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
+
 	button {
 		border-radius: 8px;
 		border: 1px solid transparent;
@@ -382,6 +372,7 @@ function mediaRecorderStop() {
 		transition: border-color 0.25s;
 		background-color: #f9f9f9;
 	}
+
 	// button:hover {
 	// 	border-color: #646cff;
 	// }

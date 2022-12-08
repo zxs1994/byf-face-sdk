@@ -8,7 +8,7 @@ export interface OnMediaRecorderStop {
 		video: Blob
 		action_list: string
 		clip_times: ByfFaceSdkProps['clipTimes']
-	}): void
+	}): Promise<boolean>
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
@@ -76,6 +76,9 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	beginButText: 'Start',
 	onMediaRecorderStop: (data) => {
 		console.log(data)
+		return new Promise<boolean>((resolve, reject) => {
+			resolve(false)
+		})
 	},
 	onGetUserMediaError: (error) => {
 		console.log(error)
@@ -108,9 +111,9 @@ function startVideo() {
 		.then((stream) => {
 			video.value.srcObject = stream
 			mediaRecorder = new MediaRecorder(stream)
-			mediaRecorder.ondataavailable = function (e: {
-				data: Blob | MediaSource
-			}) {
+			mediaRecorder.ondataavailable = async (e: {
+				data: Blob
+			}) => {
 				// 录制结束
 				canStart.value = false
 				canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
@@ -120,7 +123,7 @@ function startVideo() {
 					let videoUrl = window.URL.createObjectURL(e.data)
 					testVideo.value.src = videoUrl
 					// activeIndex.value = 0
-					playButShow.value = true
+					// playButShow.value = true
 					// function download(url) {
 					// 	const name = new Date().toISOString()
 					// 	const a = document.createElement('a')
@@ -132,17 +135,17 @@ function startVideo() {
 					// }
 					// download(videoUrl)
 				}
-				props.onMediaRecorderStop({
-					video: e.data as Blob,
+				const again = await props.onMediaRecorderStop({
+					video: e.data,
 					action_list: props.actionList.map((i) => i.value).join(),
 					clip_times: props.clipTimes,
 				})
-			}
-			setTimeout(() => {
-				if (video.value.paused) {
+				if (again) {
 					playButShow.value = true
+					recordingEnd.value = false
+					activeIndex.value = 0
 				}
-			}, 1000)
+			}
 		})
 		.catch((err) => {
 			props.onGetUserMediaError(err)

@@ -193,7 +193,7 @@ const videoOntimeupdate = async () => {
 		console.log(difference)
 		if (difference <= 80) {
 			getState(props.tooFar)
-		} else if (difference >= 150) {
+		} else if (difference >= 160) {
 			getState(props.tooClose)
 		} else {
 			getState(props.detected)

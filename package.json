@@ -1,0 +1,38 @@
+{
+  "name": "byf-face-sdk",
+  "version": "0.0.13",
+  "type": "module",
+  "files": [
+    "dist",
+    "index.d.ts"
+  ],
+  "main": "./dist/byf-face-sdk.js",
+  "module": "./dist/byf-face-sdk.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./byf-face-sdk.d.ts",
+      "import": "./dist/byf-face-sdk.js",
+      "require": "./dist/byf-face-sdk.umd.cjs"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.11",
+    "@vitejs/plugin-vue": "^3.2.0",
+    "@vue/tsconfig": "^0.1.3",
+    "axios": "^1.2.1",
+    "less": "^4.1.3",
+    "ts-vue-plugin": "^0.1.3",
+    "typescript": "^4.8.4",
+    "vite": "^3.2.3",
+    "vue-tsc": "^1.0.11",
+    "vue": "^3.2.45"
+  },
+  "dependencies": {
+    "face-api.js": "^0.22.2"
+  }
+}

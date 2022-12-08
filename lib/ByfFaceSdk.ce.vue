@@ -122,8 +122,6 @@ function startVideo() {
 				if (props.DEV) {
 					let videoUrl = window.URL.createObjectURL(e.data)
 					testVideo.value.src = videoUrl
-					// activeIndex.value = 0
-					// playButShow.value = true
 					// function download(url) {
 					// 	const name = new Date().toISOString()
 					// 	const a = document.createElement('a')

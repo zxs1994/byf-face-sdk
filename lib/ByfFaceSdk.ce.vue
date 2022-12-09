@@ -15,8 +15,8 @@ export interface ByfFaceSdkProps {
 	// videoSize?: number
 	// inputSize?: number
 	// scoreThreshold?: number
-	tooLeft?: string,
-	tooRight?: string,
+	tooLeft?: string
+	tooRight?: string
 	tooFar?: string
 	tooClose?: string
 	detected?: string

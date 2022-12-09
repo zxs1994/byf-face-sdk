@@ -12,9 +12,11 @@ export interface OnMediaRecorderStop {
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
-	videoSize?: number
-	inputSize?: number
-	scoreThreshold?: number
+	// videoSize?: number
+	// inputSize?: number
+	// scoreThreshold?: number
+	tooLeft?: string,
+	tooRight?: string,
 	tooFar?: string
 	tooClose?: string
 	detected?: string
@@ -44,9 +46,8 @@ const testVideo = ref()
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
-	videoSize: 300, // 视频尺寸
-	inputSize: 128, // 要求被32整除
-	scoreThreshold: 0.5, // 识别阀值
+	tooLeft: 'Too left',
+	tooRight: 'Too right',
 	tooFar: 'Too far, please bring the phone closer',
 	tooClose: 'Too close, please put your phone away',
 	detected: 'Please keep your avatar in the middle of the screen.',
@@ -89,6 +90,10 @@ let canvas: any
 let displaySize: any
 
 let mediaRecorder: any // 录制器
+const videoWidth = 300 // 视频宽度
+const videoHeight = videoWidth // 视屏高度
+const inputSize = 128 // 要求被32整除
+const scoreThreshold = 0.5 // 识别阀值
 
 const PromiseAll = Promise.all([
 	faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
@@ -184,8 +189,8 @@ function getUserMediaSucceed(stream: MediaStream) {
 // 调用媒体配置
 const constraints = {
 	video: {
-		width: props.videoSize,
-		height: props.videoSize,
+		width: videoWidth,
+		height: videoHeight,
 		// sourceId: 'default',
 		// facingMode: { exact: '' },
 		// @ts-ignore
@@ -229,8 +234,8 @@ const videoOntimeupdate = async () => {
 		.detectAllFaces(
 			video.value,
 			new faceapi.TinyFaceDetectorOptions({
-				inputSize: props.inputSize,
-				scoreThreshold: props.scoreThreshold,
+				inputSize: inputSize,
+				scoreThreshold: scoreThreshold,
 			})
 		)
 		.withFaceLandmarks()
@@ -260,6 +265,10 @@ const videoOntimeupdate = async () => {
 			getState(props.tooFar)
 		} else if (difference >= 160) {
 			getState(props.tooClose)
+		} else if (jawOutlineFirst.x <= 0) {
+			getState(props.tooLeft)
+		} else if (jawOutlineEnd.x >= videoWidth) {
+			getState(props.tooRight)
 		} else {
 			getState(props.detected)
 		}
@@ -352,7 +361,7 @@ function mediaRecorderStop() {
 		<div class="byf-face-sdk-title" v-html="titleHtml"></div>
 		<div class="byf-face-sdk-main" ref="main">
 			<video @playing.once="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video"
-				playsInline id="video" :width="videoSize" :height="videoSize" autoPlay muted />
+				playsInline id="video" :width="videoWidth" :height="videoHeight" autoPlay muted />
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
@@ -368,7 +377,7 @@ function mediaRecorderStop() {
 			</button>
 			<!-- <button @click="mediaRecorderStop">停止</button> -->
 		</div>
-		<video v-if="DEV" controls playsInline ref="testVideo" :width="videoSize" :height="videoSize" autoPlay muted />
+		<video v-if="DEV" controls playsInline ref="testVideo" :width="videoWidth" :height="videoHeight" autoPlay muted />
 	</div>
 </template>
 <style lang="less">

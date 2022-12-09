@@ -2,7 +2,7 @@ import { byfFaceInit } from '../lib/main'
 // import { byfFaceInit } from '../dist/byf-face-sdk.js'
 console.log(byfFaceInit)
 import './style.css'
-import axios from 'axios'
+// import axios from 'axios'
 async function onMediaRecorderStop(data: any) {
   // const request = axios.create()
   // await request.postForm('https://www.braininfra.ai/v4/api/liveness/detection/video', {

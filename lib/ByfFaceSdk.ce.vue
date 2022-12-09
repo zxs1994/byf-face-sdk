@@ -220,6 +220,7 @@ const videoOnplaying = () => {
 
 const videoOnpaused = () => {
 	playButShow.value = true
+	mediaRecorderPause()
 }
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {

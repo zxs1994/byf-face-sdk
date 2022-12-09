@@ -22,10 +22,10 @@ export interface ByfFaceSdkProps {
 	detected?: string
 	undetected?: string
 	moreFace?: string
-	actionList?: Action[]
-	clipTimes?: number
 	endMsg?: string
 	beginButText?: string
+	clipTimes?: number
+	actionList?: Action[]
 	onMediaRecorderStop: OnMediaRecorderStop
 	onGetUserMediaError: Function
 }
@@ -53,8 +53,9 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	detected: 'Please keep your avatar in the middle of the screen.',
 	undetected: 'No face is found, please face the screen, no obscuration on the face',
 	moreFace: 'More face is found',
-	clipTimes: 5000,
 	endMsg: 'The test is over and the audit is underway...',
+	beginButText: 'Start',
+	clipTimes: 5000,
 	actionList: () => [
 		{
 			value: 0,
@@ -73,7 +74,6 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 			label: 'Please nod your head up and down',
 		},
 	],
-	beginButText: 'Start',
 	onMediaRecorderStop: (data) => {
 		console.log(data)
 		return new Promise<boolean>((resolve, reject) => {

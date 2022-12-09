@@ -37,7 +37,6 @@ const main = ref()
 const playButShow = ref(true)
 const titleHtml = ref('')
 
-const undetectedStopTime = 0 // 没有检测到人脸或检测到多张人脸停止时间
 const activeIndex = ref(0)
 const canStart = ref(false)
 const recordingEnd = ref(false)
@@ -112,39 +111,101 @@ onMounted(async () => {
 // 	a.click()
 // }
 
-function startVideo() {
-	navigator.mediaDevices
-		.getUserMedia({
-			video: { width: props.videoSize, height: props.videoSize },
-		})
-		.then((stream) => {
-			video.value.srcObject = stream
-			mediaRecorder = new MediaRecorder(stream)
-			mediaRecorder.ondataavailable = async (e: {
-				data: Blob
-			}) => {
-				// 录制结束
-				canStart.value = false
-				canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-				titleHtml.value = ''
-				recordingEnd.value = true
-				if (props.DEV) {
-					let videoUrl = window.URL.createObjectURL(e.data)
-					testVideo.value.src = videoUrl
-					// download(videoUrl)
-				}
-				const again = await props.onMediaRecorderStop({
-					video: e.data,
-					action_list: props.actionList.map((i) => i.value).join(),
-					clip_times: props.clipTimes,
-				})
-				if (again) {
-					playButShow.value = true
-					recordingEnd.value = false
-					activeIndex.value = 0
-				}
+// 兼容调用摄像头
+function compatibleGetUserMedia() {
+	// 老的浏览器可能根本没有实现 mediaDevices，所以我们可以先设置一个空的对象
+	if (navigator.mediaDevices === undefined) {
+		// @ts-ignore
+		navigator.mediaDevices = {}
+	}
+	// 一些浏览器部分支持 mediaDevices。我们不能直接给对象设置 getUserMedia
+	// 因为这样可能会覆盖已有的属性。这里我们只会在没有 getUserMedia 属性的时候添加它。
+	if (navigator.mediaDevices.getUserMedia === undefined) {
+		navigator.mediaDevices.getUserMedia = function (constraints) {
+
+			// 首先，如果有 getUserMedia 的话，就获得它
+			// @ts-ignore
+			var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia
+
+			// 一些浏览器根本没实现它 - 那么就返回一个 error 到 promise 的 reject 来保持一个统一的接口
+			if (!getUserMedia) {
+				return Promise.reject(new Error('getUserMedia is not implemented in this browser'))
 			}
+
+			// 否则，为老的 navigator.getUserMedia 方法包裹一个 Promise
+			return new Promise(function (resolve, reject) {
+				getUserMedia.call(navigator, constraints, resolve, reject)
+			})
+		}
+	}
+}
+
+// 摄像头调用成功
+function getUserMediaSucceed(stream: MediaStream) {
+	// 旧的浏览器可能没有 srcObject
+	if ('srcObject' in video.value) {
+		video.value.srcObject = stream
+	} else {
+		// 防止在新的浏览器里使用它，应为它已经不再支持了
+		// @ts-ignore
+		video.value.src = window.URL.createObjectURL(stream)
+	}
+	video.value.onloadedmetadata = function () {
+		video.value.play()
+	}
+
+	mediaRecorder = new MediaRecorder(stream)
+	mediaRecorder.ondataavailable = async (e: {
+		data: Blob
+	}) => {
+		// 录制结束
+		canStart.value = false
+		canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+		titleHtml.value = ''
+		recordingEnd.value = true
+		if (props.DEV) {
+			let videoUrl = window.URL.createObjectURL(e.data)
+			testVideo.value.src = videoUrl
+			// download(videoUrl)
+		}
+		const again = await props.onMediaRecorderStop({
+			video: e.data,
+			action_list: props.actionList.map((i) => i.value).join(),
+			clip_times: props.clipTimes,
 		})
+		if (again) {
+			playButShow.value = true
+			recordingEnd.value = false
+			activeIndex.value = 0
+		}
+	}
+}
+
+// 调用媒体配置
+const constraints = {
+	video: {
+		width: props.videoSize,
+		height: props.videoSize,
+		// sourceId: 'default',
+		// facingMode: { exact: '' },
+		// @ts-ignore
+		// 放在app里面需要下面配置一下
+		"permissions": {
+			"audio-capture": {
+				"description": "Required to capture audio using getUserMedia()"
+			},
+			"video-capture": {
+				"description": "Required to capture video using getUserMedia()"
+			}
+		}
+	},
+}
+// window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
+function startVideo() {
+	compatibleGetUserMedia()
+	navigator.mediaDevices
+		.getUserMedia(constraints)
+		.then(getUserMediaSucceed)
 		.catch((err) => {
 			props.onGetUserMediaError(err)
 		})
@@ -156,10 +217,11 @@ const videoOnplaying = () => {
 	displaySize = { width: video.value.width, height: video.value.height }
 	faceapi.matchDimensions(canvas, displaySize)
 }
+
 const videoOnpaused = () => {
 	playButShow.value = true
 }
-
+// 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
 	// console.log(e)
 	if (!canStart.value) return
@@ -173,11 +235,11 @@ const videoOntimeupdate = async () => {
 			})
 		)
 		.withFaceLandmarks()
-	// .withFaceExpressions()
+
 	const resizedDetections = faceapi.resizeResults(detections, displaySize)
 	canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 	if (props.DEV) {
-		resizedDetections.length !== 0 && console.log(resizedDetections)
+		// resizedDetections.length !== 0 && console.log(resizedDetections)
 		// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
 		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
 	}
@@ -186,11 +248,12 @@ const videoOntimeupdate = async () => {
 	} else if (resizedDetections.length === 1) {
 		const landmarks = resizedDetections[0].landmarks
 		// console.log(landmarks.getJawOutline())
+		// 下巴轮廓
 		const jawOutline = landmarks.getJawOutline()
 		const jawOutlineFirst = jawOutline[0]
 		const jawOutlineEnd = jawOutline[jawOutline.length - 1]
 		const difference = jawOutlineEnd.x - jawOutlineFirst.x
-		console.log(difference)
+		// console.log(difference)
 		if (difference <= 80) {
 			getState(props.tooFar)
 		} else if (difference >= 160) {
@@ -203,22 +266,20 @@ const videoOntimeupdate = async () => {
 	}
 }
 // 录制
-
-let timer: any
+const undetectedShowTextCount = 2 // 连续多少次没有检测到人脸或检测到多张人脸显示文案
+let count = 0
 function getState(msg: string) {
 	if (msg === props.detected) {
 		titleHtml.value = msg
-		clearTimeout(timer)
-		timer = null
+		count = 0
 		mediaRecorderStart()
 	} else {
-		if (timer) return
-		timer = setTimeout(() => {
+		mediaRecorderPause()
+		count += 1
+		if (count >= undetectedShowTextCount) {
 			titleHtml.value = msg
 			console.log(msg)
-			timer = null
-			mediaRecorderPause()
-		}, undetectedStopTime)
+		}
 	}
 }
 
@@ -288,8 +349,8 @@ function mediaRecorderStop() {
 	<div class="byf-face-sdk">
 		<div class="byf-face-sdk-title" v-html="titleHtml"></div>
 		<div class="byf-face-sdk-main" ref="main">
-			<video @playing="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video" playsInline
-				id="video" :width="videoSize" :height="videoSize" autoPlay muted />
+			<video @playing.once="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video"
+				playsInline id="video" :width="videoSize" :height="videoSize" autoPlay muted />
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>

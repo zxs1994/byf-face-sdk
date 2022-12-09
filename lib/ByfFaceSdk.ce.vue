@@ -225,8 +225,6 @@ const videoOnpaused = () => {
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
 	// console.log(e)
-	if (!canStart.value) return
-	playButShow.value = false
 	const detections = await faceapi
 		.detectAllFaces(
 			video.value,
@@ -244,6 +242,9 @@ const videoOntimeupdate = async () => {
 		// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
 		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
 	}
+	if (!canStart.value) return
+	playButShow.value = false
+
 	if (resizedDetections.length === 0) {
 		getState(props.undetected)
 	} else if (resizedDetections.length === 1) {

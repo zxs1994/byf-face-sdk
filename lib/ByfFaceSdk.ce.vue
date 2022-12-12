@@ -147,6 +147,8 @@ function compatibleGetUserMedia() {
 
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
+	// console.time('videoPlay')
+	// console.time('渲染')
 	// 旧的浏览器可能没有 srcObject
 	if ('srcObject' in video.value) {
 		video.value.srcObject = stream
@@ -191,18 +193,8 @@ const constraints = {
 	video: {
 		width: videoWidth,
 		height: videoHeight,
-		// sourceId: 'default',
-		// facingMode: { exact: '' },
-		// @ts-ignore
-		// 放在app里面需要下面配置一下
-		"permissions": {
-			"audio-capture": {
-				"description": "Required to capture audio using getUserMedia()"
-			},
-			"video-capture": {
-				"description": "Required to capture video using getUserMedia()"
-			}
-		}
+		facingMode: 'user',
+		frameRate: { ideal: 30, min: 10 },
 	},
 }
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
@@ -216,11 +208,20 @@ function startVideo() {
 		})
 }
 
-const videoOnplaying = () => {
+const videoOnplaying = async () => {
 	canvas = faceapi.createCanvasFromMedia(video.value)!
 	main.value.append(canvas)
 	displaySize = { width: video.value.width, height: video.value.height }
 	faceapi.matchDimensions(canvas, displaySize)
+	// const detections = await faceapi
+	// 	.detectAllFaces(
+	// 		video.value,
+	// 		new faceapi.TinyFaceDetectorOptions({
+	// 			inputSize: inputSize,
+	// 			scoreThreshold: scoreThreshold,
+	// 		})
+	// 	)
+	// 	.withFaceLandmarks()
 }
 
 const videoOnpaused = () => {
@@ -230,6 +231,8 @@ const videoOnpaused = () => {
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
 	// console.log(e)
+	// console.timeEnd('videoPlay')
+	// console.time('渲染')
 	const detections = await faceapi
 		.detectAllFaces(
 			video.value,
@@ -247,6 +250,7 @@ const videoOntimeupdate = async () => {
 		// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
 		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
 	}
+	// console.timeEnd('渲染')
 	if (!canStart.value) return
 	playButShow.value = false
 
@@ -392,8 +396,8 @@ function mediaRecorderStop() {
 		transform: translateX(-50%);
 	}
 
-	video {
-		object-fit: cover;
+	#video {
+		border-radius: 50%;
 	}
 
 	.byf-face-sdk-main {
@@ -409,7 +413,7 @@ function mediaRecorderStop() {
 	}
 
 	.img-box {
-		width: 180px;
+		width: 40%;
 
 		img {
 			width: 100%;

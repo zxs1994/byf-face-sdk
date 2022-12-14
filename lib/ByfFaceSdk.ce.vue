@@ -270,9 +270,9 @@ const videoOntimeupdate = async () => {
 		} else if (difference >= 160) {
 			getState(props.tooClose)
 		} else if (jawOutlineFirst.x <= 0) {
-			getState(props.tooLeft)
-		} else if (jawOutlineEnd.x >= videoWidth) {
 			getState(props.tooRight)
+		} else if (jawOutlineEnd.x >= videoWidth) {
+			getState(props.tooLeft)
 		} else {
 			getState(props.detected)
 		}
@@ -403,6 +403,8 @@ function mediaRecorderStop() {
 	.byf-face-sdk-main {
 		position: relative;
 		margin: 0 auto;
+		width: fit-content;
+		transform: rotateY(180deg);
 	}
 
 	.byf-face-sdk-title {

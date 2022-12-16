@@ -51,7 +51,8 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	tooFar: 'Too far, please bring the phone closer',
 	tooClose: 'Too close, please put your phone away',
 	detected: 'Please keep your avatar in the middle of the screen.',
-	undetected: 'No face is found, please face the screen, no obscuration on the face',
+	undetected:
+		'No face is found, please face the screen, no obscuration on the face',
 	moreFace: 'More face is found',
 	endMsg: 'The test is over and the audit is underway...',
 	beginButText: 'Start',
@@ -127,14 +128,16 @@ function compatibleGetUserMedia() {
 	// 因为这样可能会覆盖已有的属性。这里我们只会在没有 getUserMedia 属性的时候添加它。
 	if (navigator.mediaDevices.getUserMedia === undefined) {
 		navigator.mediaDevices.getUserMedia = function (constraints) {
-
 			// 首先，如果有 getUserMedia 的话，就获得它
-			// @ts-ignore
-			var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia
+			var getUserMedia =
+				// @ts-ignore
+				navigator.webkitGetUserMedia || navigator.mozGetUserMedia
 
 			// 一些浏览器根本没实现它 - 那么就返回一个 error 到 promise 的 reject 来保持一个统一的接口
 			if (!getUserMedia) {
-				return Promise.reject(new Error('getUserMedia is not implemented in this browser'))
+				return Promise.reject(
+					new Error('getUserMedia is not implemented in this browser')
+				)
 			}
 
 			// 否则，为老的 navigator.getUserMedia 方法包裹一个 Promise
@@ -162,9 +165,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 
 	mediaRecorder = new MediaRecorder(stream)
-	mediaRecorder.ondataavailable = async (e: {
-		data: Blob
-	}) => {
+	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
 		// 录制结束
 		canStart.value = false
 		canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
@@ -362,26 +363,51 @@ function mediaRecorderStop() {
 </script>
 <template>
 	<div class="byf-face-sdk">
-		<div class="byf-face-sdk-title" v-html="warningMsg"></div>
-		<div class="byf-face-sdk-main" ref="main">
-			<video @playing.once="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video"
-				playsInline id="video" :width="videoWidth" :height="videoHeight" autoPlay muted />
+		<div
+			class="byf-face-sdk-title"
+			v-html="warningMsg"></div>
+		<div
+			class="byf-face-sdk-main"
+			ref="main">
+			<video
+				@playing.once="videoOnplaying"
+				@timeupdate="videoOntimeupdate"
+				@pause="videoOnpaused"
+				ref="video"
+				playsInline
+				id="video"
+				:width="videoWidth"
+				:height="videoHeight"
+				autoPlay
+				muted />
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
 		</div>
 		<div class="msg-box">
 			{{
-					recordingEnd ? endMsg : canStart ? actionList[activeIndex].label : ''
+				recordingEnd ? endMsg : canStart ? actionList[activeIndex].label : ''
 			}}
 		</div>
 		<div>
-			<button ref="playBut" v-show="playButShow" @click="onButClick" id="play-but">
+			<button
+				ref="playBut"
+				v-show="playButShow"
+				@click="onButClick"
+				id="play-but">
 				{{ beginButText }}
 			</button>
 			<!-- <button @click="mediaRecorderStop">停止</button> -->
 		</div>
-		<video v-if="DEV" controls playsInline ref="testVideo" :width="videoWidth" :height="videoHeight" autoPlay muted />
+		<video
+			v-if="DEV"
+			controls
+			playsInline
+			ref="testVideo"
+			:width="videoWidth"
+			:height="videoHeight"
+			autoPlay
+			muted />
 	</div>
 </template>
 <style lang="less">
@@ -415,7 +441,7 @@ function mediaRecorderStop() {
 	}
 
 	.img-box {
-		width: 40%;
+		width: 50%;
 
 		img {
 			width: 100%;

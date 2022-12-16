@@ -43,6 +43,7 @@ const activeIndex = ref(0)
 const canStart = ref(false)
 const recordingEnd = ref(false)
 const testVideo = ref()
+const firstRender = ref(false)
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
@@ -252,6 +253,9 @@ const videoOntimeupdate = async () => {
 		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
 	}
 	// console.timeEnd('渲染')
+	if (!firstRender.value) {
+		firstRender.value = true
+	}
 	if (!canStart.value) return
 	playButShow.value = false
 
@@ -363,9 +367,7 @@ function mediaRecorderStop() {
 </script>
 <template>
 	<div class="byf-face-sdk">
-		<div
-			class="byf-face-sdk-title"
-			v-html="warningMsg"></div>
+		<div class="byf-face-sdk-title"></div>
 		<div
 			class="byf-face-sdk-main"
 			ref="main">
@@ -385,9 +387,20 @@ function mediaRecorderStop() {
 			</div>
 		</div>
 		<div class="msg-box">
-			{{
-				recordingEnd ? endMsg : canStart ? actionList[activeIndex].label : ''
-			}}
+			<div v-if="recordingEnd">{{ endMsg }}</div>
+			<template v-else-if="canStart">
+				<template v-if="firstRender">
+					<div v-if="warningMsg === props.detected">
+						{{ actionList[activeIndex].label }}
+					</div>
+					<div
+						v-else
+						style="color: red">
+						{{ warningMsg }}
+					</div>
+				</template>
+				<div v-else>loading...</div>
+			</template>
 		</div>
 		<div>
 			<button
@@ -462,6 +475,8 @@ function mediaRecorderStop() {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		font-weight: 500;
+		font-size: 18px;
 	}
 
 	button {

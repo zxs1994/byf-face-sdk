@@ -37,7 +37,7 @@ const video = ref()
 const playBut = ref()
 const main = ref()
 const playButShow = ref(true)
-const titleHtml = ref('')
+const warningMsg = ref('')
 
 const activeIndex = ref(0)
 const canStart = ref(false)
@@ -168,7 +168,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		// 录制结束
 		canStart.value = false
 		canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-		titleHtml.value = ''
+		warningMsg.value = ''
 		recordingEnd.value = true
 		if (props.DEV) {
 			let videoUrl = window.URL.createObjectURL(e.data)
@@ -285,14 +285,14 @@ const undetectedShowTextCount = 2 // 连续多少次没有检测到人脸或检�
 let count = 0
 function getState(msg: string) {
 	if (msg === props.detected) {
-		titleHtml.value = msg
+		warningMsg.value = msg
 		count = 0
 		mediaRecorderStart()
 	} else {
 		mediaRecorderPause()
 		count += 1
 		if (count >= undetectedShowTextCount) {
-			titleHtml.value = msg
+			warningMsg.value = msg
 			console.log(msg)
 		}
 	}
@@ -362,7 +362,7 @@ function mediaRecorderStop() {
 </script>
 <template>
 	<div class="byf-face-sdk">
-		<div class="byf-face-sdk-title" v-html="titleHtml"></div>
+		<div class="byf-face-sdk-title" v-html="warningMsg"></div>
 		<div class="byf-face-sdk-main" ref="main">
 			<video @playing.once="videoOnplaying" @timeupdate="videoOntimeupdate" @pause="videoOnpaused" ref="video"
 				playsInline id="video" :width="videoWidth" :height="videoHeight" autoPlay muted />

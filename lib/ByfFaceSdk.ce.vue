@@ -12,6 +12,7 @@ export interface OnMediaRecorderStop {
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
+	autoStart?: boolean
 	// videoSize?: number
 	// inputSize?: number
 	// scoreThreshold?: number
@@ -36,7 +37,6 @@ import * as faceapi from 'face-api.js'
 const video = ref()
 const playBut = ref()
 const main = ref()
-const playButShow = ref(true)
 const warningMsg = ref('')
 
 const activeIndex = ref(0)
@@ -47,6 +47,7 @@ const firstRender = ref(false)
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
+	autoStart: false,
 	tooLeft: 'Too left',
 	tooRight: 'Too right',
 	tooFar: 'Too far, please bring the phone closer',
@@ -88,6 +89,8 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 })
 console.log(props)
 
+const playButShow = ref(!props.autoStart)
+
 let canvas: any
 let displaySize: any
 
@@ -108,15 +111,15 @@ onMounted(async () => {
 	await PromiseAll
 	startVideo()
 })
-// function download(url) {
-// 	const name = new Date().toISOString()
-// 	const a = document.createElement('a')
-// 	a.style.display = 'none'
-// 	a.download = `${name}.mp4`
-// 	a.href = url
-// 	document.body.appendChild(a)
-// 	a.click()
-// }
+function download(url) {
+	const name = new Date().toISOString()
+	const a = document.createElement('a')
+	a.style.display = 'none'
+	a.download = `${name}.mp4`
+	a.href = url
+	document.body.appendChild(a)
+	a.click()
+}
 
 // 兼容调用摄像头
 function compatibleGetUserMedia() {
@@ -148,6 +151,29 @@ function compatibleGetUserMedia() {
 		}
 	}
 }
+// 设置视频格式及编码
+function getAllSupportedMimeTypes(...mediaTypes) {
+  if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
+  const FILE_EXTENSIONS = ['webm', 'ogg', 'mp4', 'x-matroska']
+  const CODECS = ['vp9', 'vp9.0', 'vp8', 'vp8.0', 'avc1', 'av1', 'h265', 'h.265', 'h264', 'h.264', 'opus']
+  
+  return [...new Set(
+    FILE_EXTENSIONS.flatMap(ext =>
+      CODECS.flatMap(codec =>
+        mediaTypes.flatMap(mediaType => [
+          `${mediaType}/${ext};codecs:${codec}`,
+          `${mediaType}/${ext};codecs=${codec}`,
+          `${mediaType}/${ext};codecs:${codec.toUpperCase()}`,
+          `${mediaType}/${ext};codecs=${codec.toUpperCase()}`,
+          `${mediaType}/${ext}`,
+        ]),
+      ),
+    ),
+  )].filter(variation => MediaRecorder.isTypeSupported(variation))
+}
+
+const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
+// console.log(allSupportedMimeTypes)
 
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
@@ -163,22 +189,46 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 	video.value.onloadedmetadata = function () {
 		video.value.play()
+		console.log('video.value.onloadedmetadata')
+		if (props.autoStart) {
+			onButClick()
+		}
+	}
+	if (props.autoStart) {
+		setTimeout(() => {
+			video.value.play()
+			console.log('video.value.paused', video.value.paused)
+			if (video.value.paused !== false) {
+				console.log('没有按照预期自动开始,需要用户手动触发')
+				canStart.value = false
+				playButShow.value = true
+			}
+		}, 300)
 	}
 
-	mediaRecorder = new MediaRecorder(stream)
+	const options = {
+		// audioBitsPerSecond : 128000,
+		// videoBitsPerSecond : 2500000,
+		mimeType: allSupportedMimeTypes[0]
+	}
+	mediaRecorder = new MediaRecorder(stream, options)
+	console.log(mediaRecorder, mediaRecorder.mimeType)
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
+		console.log(e)
 		// 录制结束
 		canStart.value = false
 		canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 		warningMsg.value = ''
 		recordingEnd.value = true
+		const fullBlob = new Blob([e.data], { type: allSupportedMimeTypes[0] })
 		if (props.DEV) {
-			let videoUrl = window.URL.createObjectURL(e.data)
+			let videoUrl = window.URL.createObjectURL(fullBlob)
 			testVideo.value.src = videoUrl
 			// download(videoUrl)
 		}
+		console.log(fullBlob)
 		const again = await props.onMediaRecorderStop({
-			video: e.data,
+			video: fullBlob,
 			action_list: props.actionList.map((i) => i.value).join(),
 			clip_times: props.clipTimes,
 		})
@@ -364,6 +414,9 @@ function mediaRecorderStop() {
 		console.log('未开始!')
 	}
 }
+function videoCanplay() {
+	console.log('videoCanplay')
+}
 </script>
 <template>
 	<div class="byf-face-sdk">
@@ -372,6 +425,7 @@ function mediaRecorderStop() {
 			class="byf-face-sdk-main"
 			ref="main">
 			<video
+				@canplay="videoCanplay"
 				@playing.once="videoOnplaying"
 				@timeupdate="videoOntimeupdate"
 				@pause="videoOnpaused"

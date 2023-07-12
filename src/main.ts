@@ -18,7 +18,8 @@ function onGetUserMediaError(err: any) {
 const props = {
   onMediaRecorderStop,
   onGetUserMediaError,
-  DEV: true
+  // DEV: true,
+  autoStart: true
 }
 const vueElement = byfFaceInit(document.querySelector<HTMLDivElement>('#app')!, props) 
 console.log([vueElement])

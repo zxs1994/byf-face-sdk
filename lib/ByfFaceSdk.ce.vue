@@ -208,7 +208,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 
 	const options = {
 		// audioBitsPerSecond : 128000,
-		// videoBitsPerSecond : 2500000,
+		videoBitsPerSecond : 80000,
 		mimeType: allSupportedMimeTypes[0]
 	}
 	mediaRecorder = new MediaRecorder(stream, options)
@@ -246,7 +246,7 @@ const constraints = {
 		width: videoWidth,
 		height: videoHeight,
 		facingMode: 'user',
-		frameRate: { ideal: 30, min: 10 },
+		frameRate: { ideal: 25, max: 30 },
 	},
 }
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
@@ -278,7 +278,7 @@ const videoOnplaying = async () => {
 
 const videoOnpaused = () => {
 	playButShow.value = true
-	mediaRecorderPause()
+	// mediaRecorderPause()
 }
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
@@ -344,11 +344,21 @@ function getState(msg: string) {
 		count = 0
 		mediaRecorderStart()
 	} else {
-		mediaRecorderPause()
-		count += 1
-		if (count >= undetectedShowTextCount) {
-			warningMsg.value = msg
-			console.log(msg)
+		// mediaRecorderPause()
+		// count += 1
+		// if (count >= undetectedShowTextCount) {
+		// 	warningMsg.value = msg
+		// 	console.log(msg)
+		// }
+
+		if (mediaRecorder.state == 'recording') {
+			addRecordingTime()
+		} else {
+			count += 1
+			if (count >= undetectedShowTextCount) {
+				warningMsg.value = msg
+				console.log(msg)
+			}
 		}
 	}
 }

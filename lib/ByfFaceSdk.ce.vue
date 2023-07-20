@@ -5,9 +5,9 @@ export interface Action {
 }
 export interface OnMediaRecorderStop {
 	(data: {
-		video: Blob
+		[propname: string]: any
 		action_list: string
-		clip_times: ByfFaceSdkProps['clipTimes']
+		// clip_times: ByfFaceSdkProps['clipTimes']
 	}): Promise<boolean>
 }
 export interface ByfFaceSdkProps {
@@ -213,29 +213,40 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 	mediaRecorder = new MediaRecorder(stream, options)
 	console.log(mediaRecorder, mediaRecorder.mimeType)
+	let fileList:any = []
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
 		console.log(e)
-		// 录制结束
-		canStart.value = false
-		canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-		warningMsg.value = ''
-		recordingEnd.value = true
 		const fullBlob = new Blob([e.data], { type: allSupportedMimeTypes[0] })
 		if (props.DEV) {
 			let videoUrl = window.URL.createObjectURL(fullBlob)
 			testVideo.value.src = videoUrl
 			// download(videoUrl)
 		}
-		console.log(fullBlob)
-		const again = await props.onMediaRecorderStop({
-			video: fullBlob,
-			action_list: props.actionList.map((i) => i.value).join(),
-			clip_times: props.clipTimes,
-		})
-		if (again) {
-			playButShow.value = true
-			recordingEnd.value = false
-			activeIndex.value = 0
+		fileList.push(fullBlob)
+		console.log(fullBlob, fileList)
+		// 录制结束
+		// console.log(activeIndex.value, props.actionList.length)
+		if (fileList.length === props.actionList.length) {
+			console.log('录制结束')
+			canStart.value = false
+			canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+			warningMsg.value = ''
+			recordingEnd.value = true
+			const obj = {}
+			fileList.map((v, i) => {
+				obj['file' + (i + 1)] = v
+			})
+			const again = await props.onMediaRecorderStop({
+				...obj,
+				action_list: props.actionList.map((i) => i.value).join(),
+				// clip_times: props.clipTimes,
+			})
+			if (again) {
+				playButShow.value = true
+				recordingEnd.value = false
+				activeIndex.value = 0
+				fileList = []
+			}
 		}
 	}
 }
@@ -386,10 +397,13 @@ function addRecordingTime() {
 	// console.log(recordingTime, props.clipTimes, activeIndex.value)
 	if (recordingTime >= props.clipTimes) {
 		recordingTime = 0
+		mediaRecorderStop()
+		// console.log(activeIndex.value, props.actionList.length - 1)
 		if (activeIndex.value < props.actionList.length - 1) {
 			activeIndex.value += 1
+			mediaRecorderStart()
 		} else {
-			mediaRecorderStop()
+			// mediaRecorderStop()
 		}
 	}
 }

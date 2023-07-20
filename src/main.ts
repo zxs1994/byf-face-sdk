@@ -4,6 +4,7 @@ console.log(byfFaceInit)
 import './style.css'
 // import axios from 'axios'
 async function onMediaRecorderStop(data: any) {
+  console.log(data)
   // const request = axios.create()
   // await request.postForm('https://www.braininfra.ai/v4/api/liveness/detection/video', {
   //   ...data,

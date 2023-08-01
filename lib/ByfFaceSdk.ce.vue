@@ -2,6 +2,7 @@
 export interface Action {
 	value: 0 | 1 | 2 | 3
 	label: string
+	voice?: string
 }
 export interface OnMediaRecorderStop {
 	(data: {
@@ -31,7 +32,7 @@ export interface ByfFaceSdkProps {
 	onGetUserMediaError: Function
 }
 
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import * as faceapi from 'face-api.js'
 
 const video = ref()
@@ -44,6 +45,7 @@ const canStart = ref(false)
 const recordingEnd = ref(false)
 const testVideo = ref()
 const firstRender = ref(false)
+const audio = ref()
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
@@ -96,7 +98,7 @@ let displaySize: any
 
 let mediaRecorder: any // 录制器
 const videoWidth = 300 // 视频宽度
-const videoHeight = videoWidth // 视屏高度
+const videoHeight = 300 // 视屏高度
 const inputSize = 128 // 要求被32整除
 const scoreThreshold = 0.5 // 识别阀值
 
@@ -151,6 +153,10 @@ function compatibleGetUserMedia() {
 		}
 	}
 }
+
+Array.prototype.flatMap = function(callback) {
+  return this.map(callback).reduce((acc, val) => acc.concat(val), [])
+}
 // 设置视频格式及编码
 function getAllSupportedMimeTypes(...mediaTypes) {
   if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
@@ -171,7 +177,7 @@ function getAllSupportedMimeTypes(...mediaTypes) {
     ),
   )].filter(variation => MediaRecorder.isTypeSupported(variation))
 }
-
+console.log('flatMap', [].flatMap)
 const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
 // console.log(allSupportedMimeTypes)
 
@@ -254,8 +260,8 @@ function getUserMediaSucceed(stream: MediaStream) {
 // 调用媒体配置
 const constraints = {
 	video: {
-		width: videoWidth,
-		height: videoHeight,
+		width: 300,
+		height: 310,
 		facingMode: 'user',
 		frameRate: { ideal: 25, max: 30 },
 	},
@@ -388,6 +394,11 @@ const onButClick = () => {
 	canStart.value = true
 	playButShow.value = false
 	recordingEnd.value = false
+	if (props.actionList[activeIndex.value].voice) {
+		// console.log(audio)
+		// console.log(audio.value[activeIndex.value])
+		audio.value.play()
+	}
 }
 function addRecordingTime() {
 	const nowTime = new Date().getTime()
@@ -413,6 +424,10 @@ function mediaRecorderStart() {
 		mediaRecorder.start()
 		console.log('开始')
 		time = new Date().getTime()
+		if (props.actionList[activeIndex.value].voice) {
+			// console.log(audio)
+			nextTick(() => audio.value.play())
+		}
 	} else if (mediaRecorder.state === 'paused') {
 		mediaRecorder.resume()
 		console.log('继续')
@@ -490,6 +505,17 @@ function videoCanplay() {
 			</button>
 			<!-- <button @click="mediaRecorderStop">停止</button> -->
 		</div>
+		<template v-if="actionList[0].voice">
+			<audio 
+				:src="actionList[activeIndex].voice"
+				v-show="false"
+				ref="audio"></audio>
+			<audio 
+				:src="v.voice"
+				v-show="false"
+				v-for="(v, i) in actionList"
+				:key="i"></audio>
+		</template>
 		<video
 			v-if="DEV"
 			controls
@@ -515,6 +541,7 @@ function videoCanplay() {
 
 	#video {
 		border-radius: 50%;
+		object-fit: cover;
 	}
 
 	.byf-face-sdk-main {

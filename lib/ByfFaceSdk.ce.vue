@@ -33,7 +33,7 @@ export interface ByfFaceSdkProps {
 }
 
 import { onMounted, ref, nextTick } from 'vue'
-import * as faceapi from 'face-api.js'
+// import * as faceapi from 'face-api.js'
 
 const video = ref()
 const playBut = ref()
@@ -102,15 +102,15 @@ const videoHeight = 300 // 视屏高度
 const inputSize = 128 // 要求被32整除
 const scoreThreshold = 0.5 // 识别阀值
 
-const PromiseAll = Promise.all([
-	faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-	faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
-	// faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-	// faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-])
+// const PromiseAll = Promise.all([
+// 	faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
+// 	faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
+// 	// faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+// 	// faceapi.nets.faceExpressionNet.loadFromUri('/models'),
+// ])
 
 onMounted(async () => {
-	await PromiseAll
+// 	await PromiseAll
 	startVideo()
 })
 function download(url) {
@@ -235,7 +235,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		if (fileList.length === props.actionList.length) {
 			console.log('录制结束')
 			canStart.value = false
-			canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+			// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 			warningMsg.value = ''
 			recordingEnd.value = true
 			const obj = {}
@@ -278,19 +278,19 @@ function startVideo() {
 }
 
 const videoOnplaying = async () => {
-	canvas = faceapi.createCanvasFromMedia(video.value)!
-	main.value.append(canvas)
-	displaySize = { width: video.value.width, height: video.value.height }
-	faceapi.matchDimensions(canvas, displaySize)
-	// const detections = await faceapi
-	// 	.detectAllFaces(
-	// 		video.value,
-	// 		new faceapi.TinyFaceDetectorOptions({
-	// 			inputSize: inputSize,
-	// 			scoreThreshold: scoreThreshold,
-	// 		})
-	// 	)
-	// 	.withFaceLandmarks()
+// 	canvas = faceapi.createCanvasFromMedia(video.value)!
+// 	main.value.append(canvas)
+// 	displaySize = { width: video.value.width, height: video.value.height }
+// 	faceapi.matchDimensions(canvas, displaySize)
+// 	// const detections = await faceapi
+// 	// 	.detectAllFaces(
+// 	// 		video.value,
+// 	// 		new faceapi.TinyFaceDetectorOptions({
+// 	// 			inputSize: inputSize,
+// 	// 			scoreThreshold: scoreThreshold,
+// 	// 		})
+// 	// 	)
+// 	// 	.withFaceLandmarks()
 }
 
 const videoOnpaused = () => {
@@ -302,23 +302,23 @@ const videoOntimeupdate = async () => {
 	// console.log(e)
 	// console.timeEnd('videoPlay')
 	// console.time('渲染')
-	const detections = await faceapi
-		.detectAllFaces(
-			video.value,
-			new faceapi.TinyFaceDetectorOptions({
-				inputSize: inputSize,
-				scoreThreshold: scoreThreshold,
-			})
-		)
-		.withFaceLandmarks()
+	// const detections = await faceapi
+	// 	.detectAllFaces(
+	// 		video.value,
+	// 		new faceapi.TinyFaceDetectorOptions({
+	// 			inputSize: inputSize,
+	// 			scoreThreshold: scoreThreshold,
+	// 		})
+	// 	)
+	// 	.withFaceLandmarks()
 
-	const resizedDetections = faceapi.resizeResults(detections, displaySize)
-	canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-	if (props.DEV) {
-		// resizedDetections.length !== 0 && console.log(resizedDetections)
-		// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
-		faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
-	}
+	// const resizedDetections = faceapi.resizeResults(detections, displaySize)
+	// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+	// if (props.DEV) {
+	// 	// resizedDetections.length !== 0 && console.log(resizedDetections)
+	// 	// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
+	// 	faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
+	// }
 	// console.timeEnd('渲染')
 	if (!firstRender.value) {
 		firstRender.value = true
@@ -326,31 +326,31 @@ const videoOntimeupdate = async () => {
 	if (!canStart.value) return
 	playButShow.value = false
 
-	if (resizedDetections.length === 0) {
-		getState(props.undetected)
-	} else if (resizedDetections.length === 1) {
-		const landmarks = resizedDetections[0].landmarks
-		// console.log(landmarks.getJawOutline())
-		// 下巴轮廓
-		const jawOutline = landmarks.getJawOutline()
-		const jawOutlineFirst = jawOutline[0]
-		const jawOutlineEnd = jawOutline[jawOutline.length - 1]
-		const difference = jawOutlineEnd.x - jawOutlineFirst.x
-		// console.log(difference)
-		if (difference <= 80) {
-			getState(props.tooFar)
-		} else if (difference >= 160) {
-			getState(props.tooClose)
-		} else if (jawOutlineFirst.x <= 0) {
-			getState(props.tooRight)
-		} else if (jawOutlineEnd.x >= videoWidth) {
-			getState(props.tooLeft)
-		} else {
+	// if (resizedDetections.length === 0) {
+	// 	getState(props.undetected)
+	// } else if (resizedDetections.length === 1) {
+	// 	const landmarks = resizedDetections[0].landmarks
+	// 	// console.log(landmarks.getJawOutline())
+	// 	// 下巴轮廓
+	// 	const jawOutline = landmarks.getJawOutline()
+	// 	const jawOutlineFirst = jawOutline[0]
+	// 	const jawOutlineEnd = jawOutline[jawOutline.length - 1]
+	// 	const difference = jawOutlineEnd.x - jawOutlineFirst.x
+	// 	// console.log(difference)
+	// 	if (difference <= 80) {
+	// 		getState(props.tooFar)
+	// 	} else if (difference >= 160) {
+	// 		getState(props.tooClose)
+	// 	} else if (jawOutlineFirst.x <= 0) {
+	// 		getState(props.tooRight)
+	// 	} else if (jawOutlineEnd.x >= videoWidth) {
+	// 		getState(props.tooLeft)
+	// 	} else {
 			getState(props.detected)
-		}
-	} else {
-		getState(props.moreFace)
-	}
+	// 	}
+	// } else {
+	// 	getState(props.moreFace)
+	// }
 }
 // 录制
 const undetectedShowTextCount = 2 // 连续多少次没有检测到人脸或检测到多张人脸显示文案
@@ -478,6 +478,12 @@ function videoCanplay() {
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
+			<template v-if="canStart">
+				<img src="./0.gif" v-if="actionList[activeIndex].value === 0" class="img-0">
+				<img src="./1.gif" v-if="actionList[activeIndex].value === 1" class="img-1">
+				<img src="./2.gif" v-if="actionList[activeIndex].value === 2" class="img-2">
+				<img src="./3.gif" v-if="actionList[activeIndex].value === 3" class="img-3">
+			</template>
 		</div>
 		<div class="msg-box">
 			<div v-if="recordingEnd">{{ endMsg }}</div>
@@ -570,7 +576,25 @@ function videoCanplay() {
 		left: 50%;
 		transform: translate(-50%, -50%);
 	}
-
+	.img-0, .img-1, .img-2, .img-3 {
+		position: absolute;
+	}
+	.img-0 {
+		top: 0;
+		right: 0;
+	}
+	.img-1 {
+		top: 0;
+		left: 0;
+	}
+	.img-2 {
+		bottom: 0;
+		right: 0;
+	}
+	.img-3 {
+		bottom: 0;
+		left: 0;
+	}
 	.play-but {
 		display: none;
 	}

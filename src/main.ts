@@ -19,7 +19,7 @@ function onGetUserMediaError(err: any) {
 const props = {
   onMediaRecorderStop,
   onGetUserMediaError,
-  DEV: true,
+  // DEV: true,
   autoStart: false,
   actionList: [
     {

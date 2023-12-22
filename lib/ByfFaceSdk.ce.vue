@@ -13,6 +13,7 @@ export interface OnMediaRecorderStop {
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
+	takePhoto: boolean
 	autoStart?: boolean
 	videoWidth: number
 	videoBitsPerSecond?: number
@@ -36,7 +37,7 @@ export interface ByfFaceSdkProps {
 
 import { onMounted, ref, nextTick } from 'vue'
 // import * as faceapi from 'face-api.js'
-console.log('版本号:2023-11-10 01')
+console.log('版本号:2023-12-23 01')
 
 const video = ref()
 const playBut = ref()
@@ -54,6 +55,7 @@ const errorBoxShow = ref(false)
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
+	takePhoto: false,
 	autoStart: false,
 	videoWidth: 300,
 	videoBitsPerSecond: 240000,
@@ -98,18 +100,11 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 })
 console.log(props)
 
-const playButShow = ref(!props.autoStart)
 
 let mediaRecorder: any // 录制器
-// const inputSize = 128 // 要求被32整除
-// const scoreThreshold = 0.5 // 识别阀值
-
-// const PromiseAll = Promise.all([
-// 	faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-// 	faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
-// 	// faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-// 	// faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-// ])
+const takePhoto = props.takePhoto || !MediaRecorder
+// 如果自动开始或者是拍照片开始的按钮就不显示
+const playButShow = ref(!(props.autoStart || takePhoto))
 
 onMounted(async () => {
 // 	await PromiseAll
@@ -159,29 +154,6 @@ function compatibleGetUserMedia() {
 Array.prototype.flatMap = function(callback) {
   return this.map(callback).reduce((acc, val) => acc.concat(val), [])
 }
-// 设置视频格式及编码
-function getAllSupportedMimeTypes(...mediaTypes) {
-  if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
-  const FILE_EXTENSIONS = ['webm', 'ogg', 'mp4', 'x-matroska']
-  const CODECS = ['vp9', 'vp9.0', 'vp8', 'vp8.0', 'avc1', 'av1', 'h265', 'h.265', 'h264', 'h.264', 'opus']
-  
-  return [...new Set(
-    FILE_EXTENSIONS.flatMap(ext =>
-      CODECS.flatMap(codec =>
-        mediaTypes.flatMap(mediaType => [
-          `${mediaType}/${ext};codecs:${codec}`,
-          `${mediaType}/${ext};codecs=${codec}`,
-          `${mediaType}/${ext};codecs:${codec.toUpperCase()}`,
-          `${mediaType}/${ext};codecs=${codec.toUpperCase()}`,
-          `${mediaType}/${ext}`,
-        ]),
-      ),
-    ),
-  )].filter(variation => MediaRecorder.isTypeSupported(variation))
-}
-// console.log('flatMap', [].flatMap)
-const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
-// console.log(allSupportedMimeTypes)
 
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
@@ -213,7 +185,33 @@ function getUserMediaSucceed(stream: MediaStream) {
 			}
 		}, 300)
 	}
-
+	if (takePhoto) {
+		console.log('拍照')
+		return
+	}
+	// 设置视频格式及编码
+	function getAllSupportedMimeTypes(...mediaTypes) {
+		if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
+		const FILE_EXTENSIONS = ['webm', 'ogg', 'mp4', 'x-matroska']
+		const CODECS = ['vp9', 'vp9.0', 'vp8', 'vp8.0', 'avc1', 'av1', 'h265', 'h.265', 'h264', 'h.264', 'opus']
+		
+		return [...new Set(
+			FILE_EXTENSIONS.flatMap(ext =>
+				CODECS.flatMap(codec =>
+					mediaTypes.flatMap(mediaType => [
+						`${mediaType}/${ext};codecs:${codec}`,
+						`${mediaType}/${ext};codecs=${codec}`,
+						`${mediaType}/${ext};codecs:${codec.toUpperCase()}`,
+						`${mediaType}/${ext};codecs=${codec.toUpperCase()}`,
+						`${mediaType}/${ext}`,
+					]),
+				),
+			),
+		)].filter(variation => MediaRecorder.isTypeSupported(variation))
+	}
+	// console.log('flatMap', [].flatMap)
+	const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
+	// console.log(allSupportedMimeTypes)
 	const options = {
 		// audioBitsPerSecond : 128000,
 		videoBitsPerSecond: props.videoBitsPerSecond,
@@ -306,58 +304,16 @@ const videoOnpaused = () => {
 }
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
-	// console.log(e)
-	// console.timeEnd('videoPlay')
-	// console.time('渲染')
-	// const detections = await faceapi
-	// 	.detectAllFaces(
-	// 		video.value,
-	// 		new faceapi.TinyFaceDetectorOptions({
-	// 			inputSize: inputSize,
-	// 			scoreThreshold: scoreThreshold,
-	// 		})
-	// 	)
-	// 	.withFaceLandmarks()
-
-	// const resizedDetections = faceapi.resizeResults(detections, displaySize)
-	// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-	// if (props.DEV) {
-	// 	// resizedDetections.length !== 0 && console.log(resizedDetections)
-	// 	// faceapi.draw.drawDetections(canvas, resizedDetections) // 位置
-	// 	faceapi.draw.drawFaceLandmarks(canvas, resizedDetections) // 轮廓
-	// }
-	// console.timeEnd('渲染')
 	if (!firstRender.value) {
 		firstRender.value = true
 	}
 	if (!canStart.value) return
 	playButShow.value = false
-
-	// if (resizedDetections.length === 0) {
-	// 	getState(props.undetected)
-	// } else if (resizedDetections.length === 1) {
-	// 	const landmarks = resizedDetections[0].landmarks
-	// 	// console.log(landmarks.getJawOutline())
-	// 	// 下巴轮廓
-	// 	const jawOutline = landmarks.getJawOutline()
-	// 	const jawOutlineFirst = jawOutline[0]
-	// 	const jawOutlineEnd = jawOutline[jawOutline.length - 1]
-	// 	const difference = jawOutlineEnd.x - jawOutlineFirst.x
-	// 	// console.log(difference)
-	// 	if (difference <= 80) {
-	// 		getState(props.tooFar)
-	// 	} else if (difference >= 160) {
-	// 		getState(props.tooClose)
-	// 	} else if (jawOutlineFirst.x <= 0) {
-	// 		getState(props.tooRight)
-	// 	} else if (jawOutlineEnd.x >= videoWidth) {
-	// 		getState(props.tooLeft)
-	// 	} else {
-			getState(props.detected)
-	// 	}
-	// } else {
-	// 	getState(props.moreFace)
-	// }
+	if (takePhoto) {
+		
+	} else {
+		getState(props.detected)
+	}
 }
 // 录制
 const undetectedShowTextCount = 2 // 连续多少次没有检测到人脸或检测到多张人脸显示文案
@@ -368,13 +324,6 @@ function getState(msg: string) {
 		count = 0
 		mediaRecorderStart()
 	} else {
-		// mediaRecorderPause()
-		// count += 1
-		// if (count >= undetectedShowTextCount) {
-		// 	warningMsg.value = msg
-		// 	console.log(msg)
-		// }
-
 		if (mediaRecorder.state == 'recording') {
 			addRecordingTime()
 		} else {
@@ -467,6 +416,10 @@ function mediaRecorderStop() {
 function videoCanplay() {
 	console.log('videoCanplay')
 }
+
+function onTakePhoto() {
+	console.log('拍照')
+}
 </script>
 <template>
 	<div class="byf-face-sdk">
@@ -489,7 +442,7 @@ function videoCanplay() {
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
-			<template v-if="canStart">
+			<template v-if="canStart && !takePhoto">
 				<img src="./0.gif" v-if="actionList[activeIndex].value === 0" class="img-0">
 				<img src="./1.gif" v-if="actionList[activeIndex].value === 1" class="img-1">
 				<img src="./2.gif" v-if="actionList[activeIndex].value === 2" class="img-2">
@@ -520,9 +473,16 @@ function videoCanplay() {
 				id="play-but">
 				{{ beginButText }}
 			</button>
-			<!-- <button @click="mediaRecorderStop">停止</button> -->
+			<button 
+				v-if="!playButShow && takePhoto"
+				@click="onTakePhoto">
+			
+			
+			</button>
+			<input 
+				v-if="!playButShow && takePhoto" type="file" accept="image/*" capture="user"/>
 		</div>
-		<template v-if="actionList[0].voice">
+		<template v-if="actionList[0].voice && !takePhoto">
 			<audio 
 				:src="actionList[activeIndex].voice"
 				v-show="false"
@@ -534,7 +494,7 @@ function videoCanplay() {
 				:key="i"></audio>
 		</template>
 		<video
-			v-if="DEV"
+			v-if="DEV && !takePhoto"
 			controls
 			playsInline
 			ref="testVideo"

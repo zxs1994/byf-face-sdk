@@ -20,6 +20,7 @@ const props = {
   onMediaRecorderStop,
   // onGetUserMediaError,
   DEV: true,
+  takePhoto: true,
   autoStart: false,
   actionList: [
     {

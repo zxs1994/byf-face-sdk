@@ -18,31 +18,32 @@ function onGetUserMediaError(err: any) {
 }
 const props = {
   onMediaRecorderStop,
-  onGetUserMediaError,
-  // DEV: true,
+  // onGetUserMediaError,
+  DEV: true,
   autoStart: false,
   actionList: [
     {
       value: 0,
       label: 'Please open your mouth',
-      voice: 'https://desk.braininfra.com/voice/pk_mouth.mp3',
+      // voice: 'https://desk.braininfra.com/voice/pk_mouth.mp3',
     },
     {
       value: 1,
       label: 'Please blink your eyes',
-      voice: 'https://desk.braininfra.com/voice/pk_eyes.mp3',
+      // voice: 'https://desk.braininfra.com/voice/pk_eyes.mp3',
     },
     {
       value: 2,
       label: 'Please shake your head left and right',
-      voice: 'https://desk.braininfra.com/voice/pk_left_right.mp3',
+      // voice: 'https://desk.braininfra.com/voice/pk_left_right.mp3',
     },
     {
       value: 3,
       label: 'Please nod your head up and down',
-      voice: 'https://desk.braininfra.com/voice/pk_up_down.mp3',
+      // voice: 'https://desk.braininfra.com/voice/pk_up_down.mp3',
     },
-  ]
+  ],
+  videoWidth: 600
 }
 // @ts-ignore
 const vueElement = byfFaceInit(document.querySelector<HTMLDivElement>('#app')!, props) 

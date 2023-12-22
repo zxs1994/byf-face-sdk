@@ -14,6 +14,8 @@ export interface OnMediaRecorderStop {
 export interface ByfFaceSdkProps {
 	DEV?: boolean
 	autoStart?: boolean
+	videoWidth: number
+	videoBitsPerSecond?: number
 	// videoSize?: number
 	// inputSize?: number
 	// scoreThreshold?: number
@@ -34,6 +36,7 @@ export interface ByfFaceSdkProps {
 
 import { onMounted, ref, nextTick } from 'vue'
 // import * as faceapi from 'face-api.js'
+console.log('版本号:2023-11-10 01')
 
 const video = ref()
 const playBut = ref()
@@ -46,10 +49,14 @@ const recordingEnd = ref(false)
 const testVideo = ref()
 const firstRender = ref(false)
 const audio = ref()
+const errorMsg = ref('')
+const errorBoxShow = ref(false)
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
 	autoStart: false,
+	videoWidth: 300,
+	videoBitsPerSecond: 240000,
 	tooLeft: 'Too left',
 	tooRight: 'Too right',
 	tooFar: 'Too far, please bring the phone closer',
@@ -93,14 +100,9 @@ console.log(props)
 
 const playButShow = ref(!props.autoStart)
 
-let canvas: any
-let displaySize: any
-
 let mediaRecorder: any // 录制器
-const videoWidth = 300 // 视频宽度
-const videoHeight = 300 // 视屏高度
-const inputSize = 128 // 要求被32整除
-const scoreThreshold = 0.5 // 识别阀值
+// const inputSize = 128 // 要求被32整除
+// const scoreThreshold = 0.5 // 识别阀值
 
 // const PromiseAll = Promise.all([
 // 	faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
@@ -177,7 +179,7 @@ function getAllSupportedMimeTypes(...mediaTypes) {
     ),
   )].filter(variation => MediaRecorder.isTypeSupported(variation))
 }
-console.log('flatMap', [].flatMap)
+// console.log('flatMap', [].flatMap)
 const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
 // console.log(allSupportedMimeTypes)
 
@@ -214,22 +216,24 @@ function getUserMediaSucceed(stream: MediaStream) {
 
 	const options = {
 		// audioBitsPerSecond : 128000,
-		videoBitsPerSecond : 80000,
+		videoBitsPerSecond: props.videoBitsPerSecond,
 		mimeType: allSupportedMimeTypes[0]
 	}
 	mediaRecorder = new MediaRecorder(stream, options)
 	console.log(mediaRecorder, mediaRecorder.mimeType)
 	let fileList:any = []
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
-		console.log(e)
-		const fullBlob = new Blob([e.data], { type: allSupportedMimeTypes[0] })
+		// console.log(e)
+		const fullBlob = new Blob([e.data], {
+			type: allSupportedMimeTypes[0]
+		})
 		if (props.DEV) {
 			let videoUrl = window.URL.createObjectURL(fullBlob)
 			testVideo.value.src = videoUrl
 			// download(videoUrl)
 		}
 		fileList.push(fullBlob)
-		console.log(fullBlob, fileList)
+		console.log(fullBlob, fullBlob.size)
 		// 录制结束
 		// console.log(activeIndex.value, props.actionList.length)
 		if (fileList.length === props.actionList.length) {
@@ -255,15 +259,16 @@ function getUserMediaSucceed(stream: MediaStream) {
 			}
 		}
 	}
+	errorMsg.value = ''
 }
 
 // 调用媒体配置
 const constraints = {
 	video: {
-		width: 300,
-		height: 310,
+		width: props.videoWidth,
+		height: props.videoWidth,
 		facingMode: 'user',
-		frameRate: { ideal: 25, max: 30 },
+		frameRate: { ideal: 15, max: 30 },
 	},
 }
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
@@ -273,6 +278,8 @@ function startVideo() {
 		.getUserMedia(constraints)
 		.then(getUserMediaSucceed)
 		.catch((err) => {
+			errorBoxShow.value = true
+			errorMsg.value = err
 			props.onGetUserMediaError(err)
 		})
 }
@@ -384,6 +391,10 @@ let time = 0
 let recordingTime = 0
 
 const onButClick = () => {
+	if (errorMsg.value) {
+		errorBoxShow.value = true
+		return
+	}
 	video.value.play()
 	if (canStart.value == true) {
 		return
@@ -471,8 +482,8 @@ function videoCanplay() {
 				ref="video"
 				playsInline
 				id="video"
-				:width="videoWidth"
-				:height="videoHeight"
+				:width="300"
+				:height="300"
 				autoPlay
 				muted />
 			<div class="img-box">
@@ -527,10 +538,20 @@ function videoCanplay() {
 			controls
 			playsInline
 			ref="testVideo"
-			:width="videoWidth"
-			:height="videoHeight"
+			:width="300"
+			:height="300"
 			autoPlay
 			muted />
+		<div class="error-box-backdrop" v-if="errorBoxShow">
+			<div class="error-box">
+				<div class="error-box-center">
+					<div class="error-box-center-title">Unable to record video.</div>
+					<div class="error-box-center-text">Go to enable camera access or <br/> try a different browser.</div>
+					<div class="error-box-center-text">NotAllowedError.</div>
+				</div>
+				<div class="error-box-bottom" @click="errorBoxShow = false">OK</div>
+			</div>
+		</div>
 	</div>
 </template>
 <style lang="less">
@@ -624,5 +645,48 @@ function videoCanplay() {
 	// button:hover {
 	// 	border-color: #646cff;
 	// }
+	.error-box-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+	.error-box {
+		border-radius: 10px;
+		overflow: hidden;
+		width: 70vw;
+		.error-box-center {
+			background: #fff;
+			padding: 15px;
+			.error-box-center-title {
+				font-size: 18px;
+				font-weight: 600;
+				padding-bottom: 5px;
+			}
+			.error-box-center-text {
+				font-size: 14px;
+				color: #666;
+			}
+		}
+		.error-box-bottom {
+			background: #fff;
+			border-top: 1px solid #999;
+			height: 44px;
+			box-sizing: border-box;
+			padding: 0 5px;
+			overflow: hidden;
+			font-size: 17px;
+			line-height: 44px;
+			color: #007aff;
+			text-align: center;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+	}
 }
 </style>

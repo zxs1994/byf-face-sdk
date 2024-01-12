@@ -13,9 +13,10 @@ async function onMediaRecorderStop(data: any) {
   // })
   return true
 }
-function onGetUserMediaError(err: any) {
-  console.log(err)
-}
+
+// function onGetUserMediaError(err: any) {
+//   // console.log(err)
+// }
 const props = {
   onMediaRecorderStop,
   // onGetUserMediaError,

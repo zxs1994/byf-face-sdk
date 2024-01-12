@@ -8,18 +8,14 @@ export interface OnMediaRecorderStop {
 	(data: {
 		[propname: string]: any
 		action_list: string
-		// clip_times: ByfFaceSdkProps['clipTimes']
 	}): Promise<boolean>
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
-	takePhoto: boolean
+	takePhoto?: boolean
 	autoStart?: boolean
 	videoWidth: number
 	videoBitsPerSecond?: number
-	// videoSize?: number
-	// inputSize?: number
-	// scoreThreshold?: number
 	tooLeft?: string
 	tooRight?: string
 	tooFar?: string
@@ -36,8 +32,8 @@ export interface ByfFaceSdkProps {
 }
 
 import { onMounted, ref, nextTick } from 'vue'
-// import * as faceapi from 'face-api.js'
-console.log('版本号:2023-12-23 01')
+
+console.log('版本号:2023-12-28 01')
 
 const video = ref()
 const playBut = ref()
@@ -59,14 +55,6 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	autoStart: false,
 	videoWidth: 300,
 	videoBitsPerSecond: 240000,
-	tooLeft: 'Too left',
-	tooRight: 'Too right',
-	tooFar: 'Too far, please bring the phone closer',
-	tooClose: 'Too close, please put your phone away',
-	detected: 'Please keep your avatar in the middle of the screen.',
-	undetected:
-		'No face is found, please face the screen, no obscuration on the face',
-	moreFace: 'More face is found',
 	endMsg: 'The test is over and the audit is underway...',
 	beginButText: 'Start',
 	clipTimes: 5000,
@@ -102,23 +90,14 @@ console.log(props)
 
 
 let mediaRecorder: any // 录制器
-const takePhoto = props.takePhoto || !MediaRecorder
+const takePhoto = props.takePhoto || !window.MediaRecorder
 // 如果自动开始或者是拍照片开始的按钮就不显示
-const playButShow = ref(!(props.autoStart || takePhoto))
+const playButShow = ref(!props.autoStart)
 
 onMounted(async () => {
-// 	await PromiseAll
+	// 	await PromiseAll
 	startVideo()
 })
-function download(url) {
-	const name = new Date().toISOString()
-	const a = document.createElement('a')
-	a.style.display = 'none'
-	a.download = `${name}.mp4`
-	a.href = url
-	document.body.appendChild(a)
-	a.click()
-}
 
 // 兼容调用摄像头
 function compatibleGetUserMedia() {
@@ -155,8 +134,57 @@ Array.prototype.flatMap = function(callback) {
   return this.map(callback).reduce((acc, val) => acc.concat(val), [])
 }
 
+function blobToArrayBuffer(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      resolve(reader.result)
+    };
+
+    reader.onerror = reject
+
+    reader.readAsArrayBuffer(blob)
+  })
+}
+
+let fileList: any = []
+async function addFileItem(fullBlob: Blob) {
+	fileList.push(fullBlob)
+	console.log(fullBlob, fullBlob.size)
+	// 录制结束
+	// console.log(activeIndex.value, props.actionList.length)
+	if (fileList.length === props.actionList.length) {
+		console.log('录制结束')
+		canStart.value = false
+		// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+		warningMsg.value = ''
+		recordingEnd.value = true
+		const obj = {}
+		fileList.map((v, i) => {
+			obj['file' + (i + 1)] = v
+		})
+		const again = await props.onMediaRecorderStop({
+			...obj,
+			action_list: props.actionList.map((i) => i.value).join(),
+			// clip_times: props.clipTimes,
+		})
+		if (again) {
+			playButShow.value = true
+			recordingEnd.value = false
+			activeIndex.value = 0
+			fileList = []
+			takePhotoFlag.value = false
+			countDown.value = 3
+		}
+	}
+}
+
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
+	if (navigator.userAgent.indexOf('UCBrowser') != -1) {
+		throw('不支持uc浏览器')
+	}
 	// console.time('videoPlay')
 	// console.time('渲染')
 	// 旧的浏览器可能没有 srcObject
@@ -174,7 +202,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 			onButClick()
 		}
 	}
-	if (props.autoStart) {
+	if (props.autoStart || takePhoto) {
 		setTimeout(() => {
 			video.value.play()
 			console.log('video.value.paused', video.value.paused)
@@ -186,7 +214,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		}, 300)
 	}
 	if (takePhoto) {
-		console.log('拍照')
+
 		return
 	}
 	// 设置视频格式及编码
@@ -219,7 +247,6 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 	mediaRecorder = new MediaRecorder(stream, options)
 	console.log(mediaRecorder, mediaRecorder.mimeType)
-	let fileList:any = []
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
 		// console.log(e)
 		const fullBlob = new Blob([e.data], {
@@ -230,32 +257,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 			testVideo.value.src = videoUrl
 			// download(videoUrl)
 		}
-		fileList.push(fullBlob)
-		console.log(fullBlob, fullBlob.size)
-		// 录制结束
-		// console.log(activeIndex.value, props.actionList.length)
-		if (fileList.length === props.actionList.length) {
-			console.log('录制结束')
-			canStart.value = false
-			// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-			warningMsg.value = ''
-			recordingEnd.value = true
-			const obj = {}
-			fileList.map((v, i) => {
-				obj['file' + (i + 1)] = v
-			})
-			const again = await props.onMediaRecorderStop({
-				...obj,
-				action_list: props.actionList.map((i) => i.value).join(),
-				// clip_times: props.clipTimes,
-			})
-			if (again) {
-				playButShow.value = true
-				recordingEnd.value = false
-				activeIndex.value = 0
-				fileList = []
-			}
-		}
+		addFileItem(fullBlob)
 	}
 	errorMsg.value = ''
 }
@@ -269,6 +271,11 @@ const constraints = {
 		frameRate: { ideal: 15, max: 30 },
 	},
 }
+function toError(err) {
+	errorBoxShow.value = true
+	errorMsg.value = err
+	props.onGetUserMediaError(err)
+}
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
 function startVideo() {
 	compatibleGetUserMedia()
@@ -276,9 +283,7 @@ function startVideo() {
 		.getUserMedia(constraints)
 		.then(getUserMediaSucceed)
 		.catch((err) => {
-			errorBoxShow.value = true
-			errorMsg.value = err
-			props.onGetUserMediaError(err)
+			toError(err)
 		})
 }
 
@@ -302,6 +307,9 @@ const videoOnpaused = () => {
 	playButShow.value = true
 	// mediaRecorderPause()
 }
+
+let takePhotoFlag = ref(false)
+let countDown = ref(3)
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
 	if (!firstRender.value) {
@@ -310,29 +318,28 @@ const videoOntimeupdate = async () => {
 	if (!canStart.value) return
 	playButShow.value = false
 	if (takePhoto) {
-		
-	} else {
-		getState(props.detected)
-	}
-}
-// 录制
-const undetectedShowTextCount = 2 // 连续多少次没有检测到人脸或检测到多张人脸显示文案
-let count = 0
-function getState(msg: string) {
-	if (msg === props.detected) {
-		warningMsg.value = msg
-		count = 0
-		mediaRecorderStart()
-	} else {
-		if (mediaRecorder.state == 'recording') {
-			addRecordingTime()
-		} else {
-			count += 1
-			if (count >= undetectedShowTextCount) {
-				warningMsg.value = msg
-				console.log(msg)
-			}
+		if (!takePhotoFlag.value) {
+			takePhotoFlag.value = true
+			const s = setInterval(() => {
+				if (countDown.value <= 0) {
+					onTakePhoto()
+					if (activeIndex.value < props.actionList.length - 1) {
+						activeIndex.value += 1
+						countDown.value = 3
+						if (props.actionList[activeIndex.value].voice) {
+							// console.log(audio)
+							nextTick(() => audio.value.play())
+						}
+					} else {
+						clearInterval(s)
+					}
+				} else {
+					countDown.value--
+				}
+			}, 1000)
 		}
+	} else {
+		mediaRecorderStart()
 	}
 }
 
@@ -417,8 +424,21 @@ function videoCanplay() {
 	console.log('videoCanplay')
 }
 
+const imgSrc = ref('')
 function onTakePhoto() {
-	console.log('拍照')
+	const canvas = document.createElement('canvas')
+	const context = canvas.getContext('2d')!
+	canvas.width = props.videoWidth
+	canvas.height = props.videoWidth
+	context.drawImage(video.value, 0, 0, props.videoWidth, props.videoWidth)
+	canvas.toBlob(async (blob) => {
+		// const buff = await blobToArrayBuffer(blob)
+		addFileItem(blob!)
+		if(props.DEV) {
+			const url = URL.createObjectURL(blob!)
+			imgSrc.value = url
+		}
+	}, 'image/jpeg')
 }
 </script>
 <template>
@@ -442,7 +462,16 @@ function onTakePhoto() {
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
-			<template v-if="canStart && !takePhoto">
+			<span v-if="takePhotoFlag && countDown !== 0" class="countDown">{{ countDown }}</span>
+			<div style="--flaps: 6; width: 100%; height: 100%; overflow: hidden; border-radius: 50%; position: absolute; top: 0; left: 0" v-if="countDown === 0">
+				<div class="flap" style="--i: 0"></div>
+				<div class="flap" style="--i: 1"></div>
+				<div class="flap" style="--i: 2"></div>
+				<div class="flap" style="--i: 3"></div>
+				<div class="flap" style="--i: 4"></div>
+				<div class="flap" style="--i: 5"></div>
+			</div>
+			<template v-if="canStart">
 				<img src="./0.gif" v-if="actionList[activeIndex].value === 0" class="img-0">
 				<img src="./1.gif" v-if="actionList[activeIndex].value === 1" class="img-1">
 				<img src="./2.gif" v-if="actionList[activeIndex].value === 2" class="img-2">
@@ -453,14 +482,7 @@ function onTakePhoto() {
 			<div v-if="recordingEnd">{{ endMsg }}</div>
 			<template v-else-if="canStart">
 				<template v-if="firstRender">
-					<div v-if="warningMsg === props.detected">
 						{{ actionList[activeIndex].label }}
-					</div>
-					<div
-						v-else
-						style="color: red">
-						{{ warningMsg }}
-					</div>
 				</template>
 				<div v-else>loading...</div>
 			</template>
@@ -473,16 +495,15 @@ function onTakePhoto() {
 				id="play-but">
 				{{ beginButText }}
 			</button>
-			<button 
+			<!-- <button 
 				v-if="!playButShow && takePhoto"
 				@click="onTakePhoto">
-			
-			
-			</button>
-			<input 
-				v-if="!playButShow && takePhoto" type="file" accept="image/*" capture="user"/>
+				<svg t="1703309898876" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1488" width="30" height="30"><path d="M899.856074 857.576643 123.287419 857.576643c-31.780821 0-57.522088-27.592428-57.522088-61.625546L65.765331 318.473355c0-34.011628 25.742291-61.617359 57.522088-61.617359l176.717817 0c14.286378-10.69355 29.441543-28.754904 46.202275-57.896618 24.774243-43.040259 45.809325-37.754882 45.809325-37.754882l205.777667 0c0 0 63.917752 1.143033 81.644485 38.176484 14.611789 30.516014 30.503734 47.719838 43.904952 57.475016l176.511109 0 0-0.007163c31.782867 0 57.537438 27.598568 57.537438 61.61122L957.392488 795.951097C957.393511 829.984215 931.638941 857.576643 899.856074 857.576643zM511.470439 338.942549c-111.834065 0-202.485691 91.739401-202.485691 204.88432 0 113.155153 90.650603 204.882274 202.485691 204.882274 111.820762 0 202.498994-91.727121 202.498994-204.882274C713.969433 430.68195 623.292224 338.942549 511.470439 338.942549zM801.845853 311.37775c-18.611893 0-33.712823 15.312754-33.712823 34.217313 0 18.897396 15.101953 34.202986 33.712823 34.202986 18.640546 0 33.741475-15.305591 33.741475-34.202986C835.587328 326.690504 820.486398 311.37775 801.845853 311.37775zM511.579933 707.49037c-89.479941 0-162.024164-73.366961-162.024164-163.868161 0-90.506317 72.544223-163.878394 162.024164-163.878394 89.481987 0 162.02314 73.373101 162.02314 163.878394C673.603073 634.123408 601.06192 707.49037 511.579933 707.49037zM149.356145 174.918845l97.522104 0 0 41.794895-97.522104 0L149.356145 174.918845z" fill="#666666" p-id="1489"></path></svg>
+			</button> -->
+			<!-- <input v-if="!playButShow && takePhoto" type="file" accept="image/*" capture="user"/> -->
 		</div>
-		<template v-if="actionList[0].voice && !takePhoto">
+		<img :src="imgSrc" style="width: 300px; height: 300px;" v-if="DEV && takePhoto">
+		<template v-if="actionList[0].voice">
 			<audio 
 				:src="actionList[activeIndex].voice"
 				v-show="false"
@@ -536,6 +557,7 @@ function onTakePhoto() {
 		margin: 0 auto;
 		width: fit-content;
 		transform: rotateY(180deg);
+		// overflow: hidden;
 	}
 
 	.byf-face-sdk-title {
@@ -543,6 +565,43 @@ function onTakePhoto() {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+	.countDown {
+		font-size: 30px;
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%) rotateY(180deg);
+		font-size: 60px;
+		text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff;
+	}
+
+	.flap {
+		width: 150vmax;
+		height: 150vmax;
+		position: absolute;
+		bottom: 50%;
+		right: 50%;
+		pointer-events: none;
+		will-change: transform;
+		background: hsl(calc(1turn * var(--p)), 80%, 80%);
+		background: linear-gradient(35deg, #555, black);
+		border: solid 2px #999;
+		--p: calc(var(--i) / var(--flaps));
+		-webkit-animation: click 0.9s cubic-bezier(0.5, 0, 0.5, 1) 0.1s;
+						animation: click 0.9s cubic-bezier(0.5, 0, 0.5, 1) 0.1s;
+		transform-origin: bottom right;
+		transform: rotate(-0.5turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(-100%) translateY(90%);
+	}
+	@-webkit-keyframes click {
+		48%, 52% {
+			transform: rotate(-0.25turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(0%) translateY(0%);
+		}
+	}
+	@keyframes click {
+		48%, 52% {
+			transform: rotate(-0.25turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(0%) translateY(0%);
+		}
 	}
 
 	.img-box {

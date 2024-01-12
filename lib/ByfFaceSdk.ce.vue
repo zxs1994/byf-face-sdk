@@ -33,7 +33,7 @@ export interface ByfFaceSdkProps {
 
 import { onMounted, ref, nextTick } from 'vue'
 
-console.log('版本号:2023-12-28 01')
+console.log('版本号:2024-01-12 01')
 
 const video = ref()
 const playBut = ref()
@@ -261,12 +261,14 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 	errorMsg.value = ''
 }
-
+const isHuaweiBrowser = navigator.userAgent.indexOf('HuaweiBrowser') != -1
+const videoWidth = isHuaweiBrowser ? 300 : props.videoWidth
+// console.log(isHuaweiBrowser, videoWidth)
 // 调用媒体配置
 const constraints = {
 	video: {
-		width: props.videoWidth,
-		height: props.videoWidth,
+		width: videoWidth,
+		height: videoWidth,
 		facingMode: 'user',
 		frameRate: { ideal: 15, max: 30 },
 	},
@@ -428,9 +430,9 @@ const imgSrc = ref('')
 function onTakePhoto() {
 	const canvas = document.createElement('canvas')
 	const context = canvas.getContext('2d')!
-	canvas.width = props.videoWidth
-	canvas.height = props.videoWidth
-	context.drawImage(video.value, 0, 0, props.videoWidth, props.videoWidth)
+	canvas.width = videoWidth
+	canvas.height = videoWidth
+	context.drawImage(video.value, 0, 0, videoWidth, videoWidth)
 	canvas.toBlob(async (blob) => {
 		// const buff = await blobToArrayBuffer(blob)
 		addFileItem(blob!)

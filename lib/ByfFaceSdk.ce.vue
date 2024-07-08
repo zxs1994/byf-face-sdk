@@ -33,7 +33,7 @@ export interface ByfFaceSdkProps {
 
 import { onMounted, ref, nextTick } from 'vue'
 
-console.log('版本号:2024-01-12 01')
+console.log('版本号:2024-05-29 01')
 
 const video = ref()
 const playBut = ref()
@@ -95,7 +95,6 @@ const takePhoto = props.takePhoto || !window.MediaRecorder
 const playButShow = ref(!props.autoStart)
 
 onMounted(async () => {
-	// 	await PromiseAll
 	startVideo()
 })
 
@@ -134,20 +133,6 @@ Array.prototype.flatMap = function(callback) {
   return this.map(callback).reduce((acc, val) => acc.concat(val), [])
 }
 
-function blobToArrayBuffer(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      resolve(reader.result)
-    };
-
-    reader.onerror = reject
-
-    reader.readAsArrayBuffer(blob)
-  })
-}
-
 let fileList: any = []
 async function addFileItem(fullBlob: Blob) {
 	fileList.push(fullBlob)
@@ -180,8 +165,10 @@ async function addFileItem(fullBlob: Blob) {
 	}
 }
 
+let getUserMediaSucceedFlag = false
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
+	getUserMediaSucceedFlag = true
 	if (navigator.userAgent.indexOf('UCBrowser') != -1) {
 		throw('不支持uc浏览器')
 	}
@@ -247,8 +234,13 @@ function getUserMediaSucceed(stream: MediaStream) {
 	}
 	mediaRecorder = new MediaRecorder(stream, options)
 	console.log(mediaRecorder, mediaRecorder.mimeType)
+
+	mediaRecorder.onerror = (event: any) => {
+    console.error(`error recording stream: ${event.error.name}`);
+	}
+	
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
-		// console.log(e)
+		console.log('原数据:', e.data.size, e.data.type)
 		const fullBlob = new Blob([e.data], {
 			type: allSupportedMimeTypes[0]
 		})
@@ -257,13 +249,19 @@ function getUserMediaSucceed(stream: MediaStream) {
 			testVideo.value.src = videoUrl
 			// download(videoUrl)
 		}
-		addFileItem(fullBlob)
+		console.log('录制视频：' + fullBlob.size, fullBlob.type)
+		if (fullBlob.size === 0) {
+			onTakePhoto()
+		} else {
+			addFileItem(fullBlob)
+		}
 	}
 	errorMsg.value = ''
+	errorBoxShow.value = false
 }
-const isHuaweiBrowser = navigator.userAgent.indexOf('HuaweiBrowser') != -1
-const videoWidth = isHuaweiBrowser ? 300 : props.videoWidth
-// console.log(isHuaweiBrowser, videoWidth)
+const isAN00 = navigator.userAgent.indexOf('RMO-AN00') != -1
+const videoWidth = isAN00 ? 300 : props.videoWidth
+console.log(isAN00, videoWidth)
 // 调用媒体配置
 const constraints = {
 	video: {
@@ -273,36 +271,30 @@ const constraints = {
 		frameRate: { ideal: 15, max: 30 },
 	},
 }
-function toError(err) {
+function toError(err: any) {
 	errorBoxShow.value = true
 	errorMsg.value = err
 	props.onGetUserMediaError(err)
 }
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
-function startVideo() {
+async function startVideo() {
 	compatibleGetUserMedia()
-	navigator.mediaDevices
-		.getUserMedia(constraints)
-		.then(getUserMediaSucceed)
-		.catch((err) => {
-			toError(err)
-		})
+	return new Promise<void>((resolve, reject) => {
+		navigator.mediaDevices
+			.getUserMedia(constraints)
+			.then(stream => {
+				getUserMediaSucceed(stream)
+				resolve()
+			})
+			.catch((err) => {
+				toError(err)
+				reject()
+			})
+	})
 }
 
 const videoOnplaying = async () => {
-// 	canvas = faceapi.createCanvasFromMedia(video.value)!
-// 	main.value.append(canvas)
-// 	displaySize = { width: video.value.width, height: video.value.height }
-// 	faceapi.matchDimensions(canvas, displaySize)
-// 	// const detections = await faceapi
-// 	// 	.detectAllFaces(
-// 	// 		video.value,
-// 	// 		new faceapi.TinyFaceDetectorOptions({
-// 	// 			inputSize: inputSize,
-// 	// 			scoreThreshold: scoreThreshold,
-// 	// 		})
-// 	// 	)
-// 	// 	.withFaceLandmarks()
+
 }
 
 const videoOnpaused = () => {
@@ -348,10 +340,13 @@ const videoOntimeupdate = async () => {
 let time = 0
 let recordingTime = 0
 
-const onButClick = () => {
-	if (errorMsg.value) {
-		errorBoxShow.value = true
-		return
+const onButClick = async () => {
+	if (!getUserMediaSucceedFlag) {
+		try {
+			await startVideo()
+		} catch (e) {
+			return
+		}
 	}
 	video.value.play()
 	if (canStart.value == true) {
@@ -406,13 +401,7 @@ function mediaRecorderStart() {
 		addRecordingTime()
 	}
 }
-function mediaRecorderPause() {
-	if (mediaRecorder.state == 'recording') {
-		console.log('暂停')
-		mediaRecorder.pause()
-		addRecordingTime()
-	}
-}
+
 function mediaRecorderStop() {
 	// console.log(mediaRecorder)
 	if (mediaRecorder.state == 'recording' || mediaRecorder.state == 'paused') {
@@ -457,8 +446,8 @@ function onTakePhoto() {
 				ref="video"
 				playsInline
 				id="video"
-				:width="300"
-				:height="300"
+				width="300"
+				height="300"
 				autoPlay
 				muted />
 			<div class="img-box">
@@ -551,7 +540,7 @@ function onTakePhoto() {
 
 	#video {
 		border-radius: 50%;
-		object-fit: cover;
+		// object-fit: cover;
 	}
 
 	.byf-face-sdk-main {

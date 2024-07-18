@@ -18,10 +18,12 @@ async function onMediaRecorderStop(data: any) {
 //   // console.log(err)
 // }
 const props = {
+  // errorBoxHtml: '123',
+  // errorBoxOk: 'haha',
   onMediaRecorderStop,
   // onGetUserMediaError,
   DEV: true,
-  takePhoto: true,
+  // takePhoto: true,
   autoStart: false,
   actionList: [
     {
@@ -45,7 +47,7 @@ const props = {
       // voice: 'https://desk.braininfra.com/voice/pk_up_down.mp3',
     },
   ],
-  videoWidth: 600
+  videoWidth: 600,
 }
 // @ts-ignore
 const vueElement = byfFaceInit(document.querySelector<HTMLDivElement>('#app')!, props) 

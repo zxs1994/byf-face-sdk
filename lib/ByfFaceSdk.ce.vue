@@ -16,15 +16,10 @@ export interface ByfFaceSdkProps {
 	autoStart?: boolean
 	videoWidth: number
 	videoBitsPerSecond?: number
-	tooLeft?: string
-	tooRight?: string
-	tooFar?: string
-	tooClose?: string
-	detected?: string
-	undetected?: string
-	moreFace?: string
 	endMsg?: string
 	beginButText?: string
+	errorBoxHtml?: string
+	errorBoxOk?: string
 	clipTimes?: number
 	actionList?: Action[]
 	onMediaRecorderStop: OnMediaRecorderStop
@@ -32,8 +27,9 @@ export interface ByfFaceSdkProps {
 }
 
 import { onMounted, ref, nextTick } from 'vue'
+import axios from 'axios'
 
-console.log('版本号:2024-05-29 01')
+console.log('版本号:2024-07-13 01')
 
 const video = ref()
 const playBut = ref()
@@ -57,6 +53,10 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	videoBitsPerSecond: 240000,
 	endMsg: 'The test is over and the audit is underway...',
 	beginButText: 'Start',
+	errorBoxHtml: `<div class="error-box-center-title">Unable to record video.</div>
+								<div class="error-box-center-text">Go to enable camera access or <br/> try a different browser.</div>
+								<div class="error-box-center-text">NotAllowedError.</div>`,
+	errorBoxOk: 'OK',
 	clipTimes: 5000,
 	actionList: () => [
 		{
@@ -91,6 +91,9 @@ console.log(props)
 
 let mediaRecorder: any // 录制器
 const takePhoto = props.takePhoto || !window.MediaRecorder
+if (!window.MediaRecorder) {
+	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=NoMediaRecorder`)
+}
 // 如果自动开始或者是拍照片开始的按钮就不显示
 const playButShow = ref(!props.autoStart)
 
@@ -251,6 +254,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		}
 		console.log('录制视频：' + fullBlob.size, fullBlob.type)
 		if (fullBlob.size === 0) {
+			axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=videoSize0`)
 			onTakePhoto()
 		} else {
 			addFileItem(fullBlob)
@@ -274,6 +278,7 @@ const constraints = {
 function toError(err: any) {
 	errorBoxShow.value = true
 	errorMsg.value = err
+	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${err}`)
 	props.onGetUserMediaError(err)
 }
 // window.onload = navigator.mediaDevices.enumerateDevices().then((res) => console.log(res))
@@ -516,12 +521,8 @@ function onTakePhoto() {
 			muted />
 		<div class="error-box-backdrop" v-if="errorBoxShow">
 			<div class="error-box">
-				<div class="error-box-center">
-					<div class="error-box-center-title">Unable to record video.</div>
-					<div class="error-box-center-text">Go to enable camera access or <br/> try a different browser.</div>
-					<div class="error-box-center-text">NotAllowedError.</div>
-				</div>
-				<div class="error-box-bottom" @click="errorBoxShow = false">OK</div>
+				<div class="error-box-center" v-html="props.errorBoxHtml"></div>
+				<div class="error-box-bottom" @click="errorBoxShow = false">{{ props.errorBoxOk }}</div>
 			</div>
 		</div>
 	</div>

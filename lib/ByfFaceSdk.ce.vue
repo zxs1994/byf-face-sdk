@@ -26,10 +26,10 @@ export interface ByfFaceSdkProps {
 	onGetUserMediaError: Function
 }
 
-import { onMounted, ref, nextTick } from 'vue'
+import { onMounted, ref, nextTick, onBeforeUnmount, defineExpose } from 'vue'
 import axios from 'axios'
 
-console.log('版本号:2024-07-13 01')
+console.log('版本号:2024-07-22 01')
 
 const video = ref()
 const playBut = ref()
@@ -76,7 +76,7 @@ const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 			label: 'Please nod your head up and down',
 		},
 	],
-	onMediaRecorderStop: (data) => {
+	onMediaRecorderStop: (data: any) => {
 		console.log(data)
 		return new Promise<boolean>((resolve, reject) => {
 			resolve(false)
@@ -99,6 +99,11 @@ const playButShow = ref(!props.autoStart)
 
 onMounted(async () => {
 	startVideo()
+})
+
+onBeforeUnmount(() => {
+	stopMedia && stopMedia()
+	console.log('onBeforeUnmount')
 })
 
 // 兼容调用摄像头
@@ -132,7 +137,9 @@ function compatibleGetUserMedia() {
 	}
 }
 
-Array.prototype.flatMap = function(callback) {
+// @ts-ignore
+Array.prototype.flatMap = function (callback) {
+	// @ts-ignore
   return this.map(callback).reduce((acc, val) => acc.concat(val), [])
 }
 
@@ -149,14 +156,16 @@ async function addFileItem(fullBlob: Blob) {
 		warningMsg.value = ''
 		recordingEnd.value = true
 		const obj = {}
+		// @ts-ignore
 		fileList.map((v, i) => {
+			// @ts-ignore
 			obj['file' + (i + 1)] = v
 		})
 		const again = await props.onMediaRecorderStop({
 			...obj,
 			action_list: props.actionList.map((i) => i.value).join(),
-			// clip_times: props.clipTimes,
 		})
+		stopMedia!()
 		if (again) {
 			playButShow.value = true
 			recordingEnd.value = false
@@ -169,8 +178,14 @@ async function addFileItem(fullBlob: Blob) {
 }
 
 let getUserMediaSucceedFlag = false
+let stopMedia: Function
+
 // 摄像头调用成功
 function getUserMediaSucceed(stream: MediaStream) {
+	stopMedia = () => {
+		stream.getTracks().forEach(track => track.stop())
+		getUserMediaSucceedFlag = false
+	}
 	getUserMediaSucceedFlag = true
 	if (navigator.userAgent.indexOf('UCBrowser') != -1) {
 		throw('不支持uc浏览器')
@@ -208,7 +223,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		return
 	}
 	// 设置视频格式及编码
-	function getAllSupportedMimeTypes(...mediaTypes) {
+	function getAllSupportedMimeTypes(...mediaTypes: any) {
 		if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
 		const FILE_EXTENSIONS = ['webm', 'ogg', 'mp4', 'x-matroska']
 		const CODECS = ['vp9', 'vp9.0', 'vp8', 'vp8.0', 'avc1', 'av1', 'h265', 'h.265', 'h264', 'h.264', 'opus']
@@ -216,6 +231,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 		return [...new Set(
 			FILE_EXTENSIONS.flatMap(ext =>
 				CODECS.flatMap(codec =>
+					// @ts-ignore
 					mediaTypes.flatMap(mediaType => [
 						`${mediaType}/${ext};codecs:${codec}`,
 						`${mediaType}/${ext};codecs=${codec}`,
@@ -239,9 +255,9 @@ function getUserMediaSucceed(stream: MediaStream) {
 	console.log(mediaRecorder, mediaRecorder.mimeType)
 
 	mediaRecorder.onerror = (event: any) => {
-    console.error(`error recording stream: ${event.error.name}`);
+		console.error(`error recording stream: ${event.error.name}`)
 	}
-	
+
 	mediaRecorder.ondataavailable = async (e: { data: Blob }) => {
 		console.log('原数据:', e.data.size, e.data.type)
 		const fullBlob = new Blob([e.data], {
@@ -416,6 +432,7 @@ function mediaRecorderStop() {
 		console.log('未开始!')
 	}
 }
+
 function videoCanplay() {
 	console.log('videoCanplay')
 }
@@ -436,6 +453,7 @@ function onTakePhoto() {
 		}
 	}, 'image/jpeg')
 }
+
 </script>
 <template>
 	<div class="byf-face-sdk">

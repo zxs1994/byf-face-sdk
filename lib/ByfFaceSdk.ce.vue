@@ -14,6 +14,7 @@ export interface ByfFaceSdkProps {
 	DEV?: boolean
 	takePhoto?: boolean
 	autoStart?: boolean
+	autoStartCountDown?: boolean
 	videoWidth: number
 	videoBitsPerSecond?: number
 	endMsg?: string
@@ -29,7 +30,7 @@ export interface ByfFaceSdkProps {
 import { onMounted, ref, nextTick, onBeforeUnmount, defineExpose } from 'vue'
 import axios from 'axios'
 
-console.log('版本号:2024-07-22 01')
+console.log('版本号:2024-11-06 01')
 
 const video = ref()
 const playBut = ref()
@@ -45,12 +46,35 @@ const audio = ref()
 const errorMsg = ref('')
 const errorBoxShow = ref(false)
 
+const countdownActive = ref(false)
+const countdown = ref(3)
+let intervalId: any = null
+let frist = true // 页面首次录制
+
+const startCountdown = (callback) => {
+  if (countdownActive.value) return
+
+  countdownActive.value = true
+  countdown.value = 3
+
+  intervalId = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+			clearInterval(intervalId)
+			intervalId = null
+			callback && callback()
+      countdownActive.value = false
+    }
+  }, 1000)
+}
+
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
 	takePhoto: false,
 	autoStart: false,
+	autoStartCountDown: true, // autoStart: true 时, 默认开启倒计时, 
 	videoWidth: 300,
-	videoBitsPerSecond: 240000,
+	videoBitsPerSecond: 250000,
 	endMsg: 'The test is over and the audit is underway...',
 	beginButText: 'Start',
 	errorBoxHtml: `<div class="error-box-center-title">Unable to record video.</div>
@@ -90,7 +114,7 @@ console.log(props)
 
 
 let mediaRecorder: any // 录制器
-const takePhoto = props.takePhoto || !window.MediaRecorder
+let takePhoto = props.takePhoto || !window.MediaRecorder
 if (!window.MediaRecorder) {
 	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=NoMediaRecorder`)
 }
@@ -103,6 +127,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
 	stopMedia && stopMedia()
+	intervalId && clearInterval(intervalId)
 	console.log('onBeforeUnmount')
 })
 
@@ -151,6 +176,7 @@ async function addFileItem(fullBlob: Blob) {
 	// console.log(activeIndex.value, props.actionList.length)
 	if (fileList.length === props.actionList.length) {
 		console.log('录制结束')
+		frist = false
 		canStart.value = false
 		// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 		warningMsg.value = ''
@@ -161,10 +187,16 @@ async function addFileItem(fullBlob: Blob) {
 			// @ts-ignore
 			obj['file' + (i + 1)] = v
 		})
-		const again = await props.onMediaRecorderStop({
-			...obj,
-			action_list: props.actionList.map((i) => i.value).join(),
-		})
+		let again
+		try {
+			again = await props.onMediaRecorderStop({
+				...obj,
+				action_list: props.actionList.map((i) => i.value).join(),
+			})
+		} catch (e) {
+			console.log(e)
+			again = true
+		}
 		stopMedia!()
 		if (again) {
 			playButShow.value = true
@@ -172,7 +204,6 @@ async function addFileItem(fullBlob: Blob) {
 			activeIndex.value = 0
 			fileList = []
 			takePhotoFlag.value = false
-			countDown.value = 3
 		}
 	}
 }
@@ -180,8 +211,56 @@ async function addFileItem(fullBlob: Blob) {
 let getUserMediaSucceedFlag = false
 let stopMedia: Function
 
+const options: any = {
+	// audioBitsPerSecond : 128000,
+	videoBitsPerSecond: undefined,
+	mimeType: undefined,
+}
+
+let recorder
+function createMediaRecorder(stream: MediaStream, options) {
+	if (!window.MediaRecorder) {
+		// 没录制器
+		takePhoto = true
+		return
+	}
+	recorder = new MediaRecorder(stream, options)
+
+	recorder.onerror = (event: any) => {
+		console.error(`error recording stream: ${event.error.name}`)
+	}
+}
+let recorderstartP
+function recorderstart() {
+
+	recorderstartP = new Promise<void>((resolve, reject) => {
+		if (!recorder) {
+			resolve()
+			return
+		}
+		recorder.start()
+		recorder.ondataavailable = async (e: { data: Blob }) => {
+			console.log('测试录制器数据:', e.data.size, e.data.type)
+			if (e.data.size === 0) {
+				takePhoto = true
+				axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=videoSize0`)
+			}
+			if (e.data.type.indexOf('mp4') >= 0) {
+				console.log('设置了videoBitsPerSecond')
+				options.videoBitsPerSecond = props.videoBitsPerSecond
+			}
+			
+			resolve()
+		}
+		recorder.onstart = () => {
+			setTimeout(() => recorder.stop(), 300)
+		}
+		
+	})
+}
+
 // 摄像头调用成功
-function getUserMediaSucceed(stream: MediaStream) {
+async function getUserMediaSucceed(stream: MediaStream) {
 	stopMedia = () => {
 		stream.getTracks().forEach(track => track.stop())
 		getUserMediaSucceedFlag = false
@@ -204,7 +283,11 @@ function getUserMediaSucceed(stream: MediaStream) {
 		video.value.play()
 		console.log('video.value.onloadedmetadata')
 		if (props.autoStart) {
-			onButClick()
+			if (props.autoStartCountDown && frist) {
+				startCountdown(onButClick)
+			} else {
+				onButClick()
+			}
 		}
 	}
 	if (props.autoStart || takePhoto) {
@@ -218,10 +301,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 			}
 		}, 300)
 	}
-	if (takePhoto) {
-
-		return
-	}
+	
 	// 设置视频格式及编码
 	function getAllSupportedMimeTypes(...mediaTypes: any) {
 		if (!mediaTypes.length) mediaTypes.push(...['video', 'audio'])
@@ -246,11 +326,16 @@ function getUserMediaSucceed(stream: MediaStream) {
 	// console.log('flatMap', [].flatMap)
 	const allSupportedMimeTypes = getAllSupportedMimeTypes('video')
 	// console.log(allSupportedMimeTypes)
-	const options = {
-		// audioBitsPerSecond : 128000,
-		videoBitsPerSecond: props.videoBitsPerSecond,
-		mimeType: allSupportedMimeTypes[0]
+	options.mimeType = allSupportedMimeTypes[0]
+
+	createMediaRecorder(stream, options)
+	recorderstart()
+	await recorderstartP
+	if (takePhoto) {
+		return
 	}
+
+	console.log(options)
 	mediaRecorder = new MediaRecorder(stream, options)
 	console.log(mediaRecorder, mediaRecorder.mimeType)
 
@@ -269,12 +354,7 @@ function getUserMediaSucceed(stream: MediaStream) {
 			// download(videoUrl)
 		}
 		console.log('录制视频：' + fullBlob.size, fullBlob.type)
-		if (fullBlob.size === 0) {
-			axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=videoSize0`)
-			onTakePhoto()
-		} else {
-			addFileItem(fullBlob)
-		}
+		addFileItem(fullBlob)
 	}
 	errorMsg.value = ''
 	errorBoxShow.value = false
@@ -324,35 +404,23 @@ const videoOnpaused = () => {
 }
 
 let takePhotoFlag = ref(false)
-let countDown = ref(3)
+
 // 视频播放事件, 大概200多毫秒一次
 const videoOntimeupdate = async () => {
+	if (recorderstartP) {
+		await recorderstartP
+	} else {
+		recorderstart()
+		return
+	}
+
 	if (!firstRender.value) {
 		firstRender.value = true
 	}
 	if (!canStart.value) return
 	playButShow.value = false
 	if (takePhoto) {
-		if (!takePhotoFlag.value) {
-			takePhotoFlag.value = true
-			const s = setInterval(() => {
-				if (countDown.value <= 0) {
-					onTakePhoto()
-					if (activeIndex.value < props.actionList.length - 1) {
-						activeIndex.value += 1
-						countDown.value = 3
-						if (props.actionList[activeIndex.value].voice) {
-							// console.log(audio)
-							nextTick(() => audio.value.play())
-						}
-					} else {
-						clearInterval(s)
-					}
-				} else {
-					countDown.value--
-				}
-			}, 1000)
-		}
+		onTakePhoto()
 	} else {
 		mediaRecorderStart()
 	}
@@ -379,6 +447,7 @@ const onButClick = async () => {
 	canStart.value = true
 	playButShow.value = false
 	recordingEnd.value = false
+	time = new Date().getTime()
 	if (props.actionList[activeIndex.value].voice) {
 		// console.log(audio)
 		// console.log(audio.value[activeIndex.value])
@@ -438,20 +507,72 @@ function videoCanplay() {
 }
 
 const imgSrc = ref('')
-function onTakePhoto() {
+let imageType = 'image/jpeg'
+function createCanvas() {
 	const canvas = document.createElement('canvas')
 	const context = canvas.getContext('2d')!
 	canvas.width = videoWidth
 	canvas.height = videoWidth
-	context.drawImage(video.value, 0, 0, videoWidth, videoWidth)
-	canvas.toBlob(async (blob) => {
-		// const buff = await blobToArrayBuffer(blob)
-		addFileItem(blob!)
-		if(props.DEV) {
-			const url = URL.createObjectURL(blob!)
-			imgSrc.value = url
+
+	// const hasWebp = canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0
+	// imageType = hasWebp ? 'image/webp' : 'image/jpeg'
+
+	return async function () {
+		return new Promise<Blob>((resolve, reject) => {
+			context.drawImage(video.value, 0, 0, videoWidth, videoWidth)
+			canvas.toBlob(async (blob) => {
+				// const buff = await blobToArrayBuffer(blob)
+				// addFileItem(blob!)
+				resolve(blob!)
+				if(props.DEV) {
+					const url = URL.createObjectURL(blob!)
+					imgSrc.value = url
+				}
+			}, imageType, 0.5)
+
+		})
+	}
+}
+
+let getImg
+let imageBlobs: any[] = []
+
+async function onTakePhoto() {
+	// takePhotoFlag.value = true
+	if (takePhotoFlag.value) {
+		return
+	}
+
+	if (!getImg) {
+		getImg = createCanvas()
+	}
+	
+	const nowTime = new Date().getTime()
+	
+	// console.log(nowTime - time)
+	recordingTime += nowTime - time
+	time = nowTime
+	
+	if (recordingTime >= props.clipTimes) {
+		recordingTime = 0
+		console.log(imageBlobs)
+		const combinedBlob = new Blob(imageBlobs, { type: imageType })
+		imageBlobs = []
+		addFileItem(combinedBlob)
+		// console.log(activeIndex.value, props.actionList.length - 1)
+		if (activeIndex.value < props.actionList.length - 1) {
+			activeIndex.value += 1
+			if (props.actionList[activeIndex.value].voice) {
+				// console.log(audio)
+				nextTick(() => audio.value.play())
+			}
+		} else {
+			console.log(activeIndex.value)
 		}
-	}, 'image/jpeg')
+	} else {
+		const img = await getImg()
+		imageBlobs.push(img)
+	}
 }
 
 </script>
@@ -476,15 +597,7 @@ function onTakePhoto() {
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
-			<span v-if="takePhotoFlag && countDown !== 0" class="countDown">{{ countDown }}</span>
-			<div style="--flaps: 6; width: 100%; height: 100%; overflow: hidden; border-radius: 50%; position: absolute; top: 0; left: 0" v-if="countDown === 0">
-				<div class="flap" style="--i: 0"></div>
-				<div class="flap" style="--i: 1"></div>
-				<div class="flap" style="--i: 2"></div>
-				<div class="flap" style="--i: 3"></div>
-				<div class="flap" style="--i: 4"></div>
-				<div class="flap" style="--i: 5"></div>
-			</div>
+
 			<template v-if="canStart">
 				<img src="./0.gif" v-if="actionList[activeIndex].value === 0" class="img-0">
 				<img src="./1.gif" v-if="actionList[activeIndex].value === 1" class="img-1">
@@ -493,6 +606,7 @@ function onTakePhoto() {
 			</template>
 		</div>
 		<div class="msg-box">
+			<div v-if="countdownActive" style="font-size: 20px;">{{ countdown }}</div>
 			<div v-if="recordingEnd">{{ endMsg }}</div>
 			<template v-else-if="canStart">
 				<template v-if="firstRender">
@@ -509,12 +623,6 @@ function onTakePhoto() {
 				id="play-but">
 				{{ beginButText }}
 			</button>
-			<!-- <button 
-				v-if="!playButShow && takePhoto"
-				@click="onTakePhoto">
-				<svg t="1703309898876" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1488" width="30" height="30"><path d="M899.856074 857.576643 123.287419 857.576643c-31.780821 0-57.522088-27.592428-57.522088-61.625546L65.765331 318.473355c0-34.011628 25.742291-61.617359 57.522088-61.617359l176.717817 0c14.286378-10.69355 29.441543-28.754904 46.202275-57.896618 24.774243-43.040259 45.809325-37.754882 45.809325-37.754882l205.777667 0c0 0 63.917752 1.143033 81.644485 38.176484 14.611789 30.516014 30.503734 47.719838 43.904952 57.475016l176.511109 0 0-0.007163c31.782867 0 57.537438 27.598568 57.537438 61.61122L957.392488 795.951097C957.393511 829.984215 931.638941 857.576643 899.856074 857.576643zM511.470439 338.942549c-111.834065 0-202.485691 91.739401-202.485691 204.88432 0 113.155153 90.650603 204.882274 202.485691 204.882274 111.820762 0 202.498994-91.727121 202.498994-204.882274C713.969433 430.68195 623.292224 338.942549 511.470439 338.942549zM801.845853 311.37775c-18.611893 0-33.712823 15.312754-33.712823 34.217313 0 18.897396 15.101953 34.202986 33.712823 34.202986 18.640546 0 33.741475-15.305591 33.741475-34.202986C835.587328 326.690504 820.486398 311.37775 801.845853 311.37775zM511.579933 707.49037c-89.479941 0-162.024164-73.366961-162.024164-163.868161 0-90.506317 72.544223-163.878394 162.024164-163.878394 89.481987 0 162.02314 73.373101 162.02314 163.878394C673.603073 634.123408 601.06192 707.49037 511.579933 707.49037zM149.356145 174.918845l97.522104 0 0 41.794895-97.522104 0L149.356145 174.918845z" fill="#666666" p-id="1489"></path></svg>
-			</button> -->
-			<!-- <input v-if="!playButShow && takePhoto" type="file" accept="image/*" capture="user"/> -->
 		</div>
 		<img :src="imgSrc" style="width: 300px; height: 300px;" v-if="DEV && takePhoto">
 		<template v-if="actionList[0].voice">
@@ -575,43 +683,6 @@ function onTakePhoto() {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-	}
-	.countDown {
-		font-size: 30px;
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%) rotateY(180deg);
-		font-size: 60px;
-		text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff;
-	}
-
-	.flap {
-		width: 150vmax;
-		height: 150vmax;
-		position: absolute;
-		bottom: 50%;
-		right: 50%;
-		pointer-events: none;
-		will-change: transform;
-		background: hsl(calc(1turn * var(--p)), 80%, 80%);
-		background: linear-gradient(35deg, #555, black);
-		border: solid 2px #999;
-		--p: calc(var(--i) / var(--flaps));
-		-webkit-animation: click 0.9s cubic-bezier(0.5, 0, 0.5, 1) 0.1s;
-						animation: click 0.9s cubic-bezier(0.5, 0, 0.5, 1) 0.1s;
-		transform-origin: bottom right;
-		transform: rotate(-0.5turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(-100%) translateY(90%);
-	}
-	@-webkit-keyframes click {
-		48%, 52% {
-			transform: rotate(-0.25turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(0%) translateY(0%);
-		}
-	}
-	@keyframes click {
-		48%, 52% {
-			transform: rotate(-0.25turn) rotate(calc(1turn * var(--p))) skewX(30deg) translateX(0%) translateY(0%);
-		}
 	}
 
 	.img-box {

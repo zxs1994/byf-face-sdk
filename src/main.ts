@@ -23,9 +23,9 @@ const props = {
   onMediaRecorderStop,
   // onGetUserMediaError,
   DEV: true,
-  takePhoto: true,
+  // takePhoto: true,
+  // audio: true,
   autoStart: true,
-  autoStartCountDown: false,
   actionList: [
     {
       value: 0,

@@ -12,9 +12,9 @@ export interface OnMediaRecorderStop {
 }
 export interface ByfFaceSdkProps {
 	DEV?: boolean
+	audio?: boolean
 	takePhoto?: boolean
-	autoStart?: boolean
-	autoStartCountDown?: boolean
+	autoStart?: boolean | Number
 	videoWidth: number
 	videoBitsPerSecond?: number
 	endMsg?: string
@@ -30,7 +30,7 @@ export interface ByfFaceSdkProps {
 import { onMounted, ref, nextTick, onBeforeUnmount, defineExpose } from 'vue'
 import axios from 'axios'
 
-console.log('版本号:2024-11-06 01')
+console.log('版本号:2025-01-17 01')
 
 const video = ref()
 const playBut = ref()
@@ -54,8 +54,9 @@ let frist = true // 页面首次录制
 const startCountdown = (callback) => {
   if (countdownActive.value) return
 
-  countdownActive.value = true
-  countdown.value = 3
+	countdownActive.value = true
+	// @ts-ignore
+  countdown.value = props.autoStart
 
   intervalId = setInterval(() => {
     countdown.value--
@@ -70,9 +71,9 @@ const startCountdown = (callback) => {
 
 const props = withDefaults(defineProps<ByfFaceSdkProps>(), {
 	DEV: false,
+	audio: false,
 	takePhoto: false,
 	autoStart: false,
-	autoStartCountDown: true, // autoStart: true 时, 默认开启倒计时, 
 	videoWidth: 300,
 	videoBitsPerSecond: 250000,
 	endMsg: 'The test is over and the audit is underway...',
@@ -118,8 +119,8 @@ let takePhoto = props.takePhoto || !window.MediaRecorder
 if (!window.MediaRecorder) {
 	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=NoMediaRecorder`)
 }
-// 如果自动开始或者是拍照片开始的按钮就不显示
-const playButShow = ref(!props.autoStart)
+// 如果自动开始
+const playButShow = ref(props.autoStart === false)
 
 onMounted(async () => {
 	startVideo()
@@ -208,6 +209,18 @@ async function addFileItem(fullBlob: Blob) {
 	}
 }
 
+function checkPlayBut() {
+	setTimeout(() => {
+		video.value.play()
+		console.log('video.value.paused', video.value.paused)
+		if (video.value.paused !== false) {
+			console.log('没有按照预期自动开始,需要用户手动触发')
+			canStart.value = false
+			playButShow.value = true
+		}
+	}, 300)
+}
+
 let getUserMediaSucceedFlag = false
 let stopMedia: Function
 
@@ -243,7 +256,6 @@ function recorderstart() {
 			console.log('测试录制器数据:', e.data.size, e.data.type)
 			if (e.data.size === 0) {
 				takePhoto = true
-				axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=videoSize0`)
 			}
 			if (e.data.type.indexOf('mp4') >= 0) {
 				console.log('设置了videoBitsPerSecond')
@@ -253,7 +265,7 @@ function recorderstart() {
 			resolve()
 		}
 		recorder.onstart = () => {
-			setTimeout(() => recorder.stop(), 300)
+			setTimeout(() => recorder.stop(), 1000)
 		}
 		
 	})
@@ -278,28 +290,6 @@ async function getUserMediaSucceed(stream: MediaStream) {
 		// 防止在新的浏览器里使用它，应为它已经不再支持了
 		// @ts-ignore
 		video.value.src = window.URL.createObjectURL(stream)
-	}
-	video.value.onloadedmetadata = function () {
-		video.value.play()
-		console.log('video.value.onloadedmetadata')
-		if (props.autoStart) {
-			if (props.autoStartCountDown && frist) {
-				startCountdown(onButClick)
-			} else {
-				onButClick()
-			}
-		}
-	}
-	if (props.autoStart || takePhoto) {
-		setTimeout(() => {
-			video.value.play()
-			console.log('video.value.paused', video.value.paused)
-			if (video.value.paused !== false) {
-				console.log('没有按照预期自动开始,需要用户手动触发')
-				canStart.value = false
-				playButShow.value = true
-			}
-		}, 300)
 	}
 	
 	// 设置视频格式及编码
@@ -330,6 +320,22 @@ async function getUserMediaSucceed(stream: MediaStream) {
 
 	createMediaRecorder(stream, options)
 	recorderstart()
+
+	video.value.onloadedmetadata = async function () {
+		await recorderstartP
+		video.value.play()
+		console.log('video.value.onloadedmetadata')
+		if (props.autoStart !== false) {
+			if (typeof props.autoStart === 'number' && props.autoStart && frist) {
+				startCountdown(onButClick)
+			} else {
+				onButClick()
+			}
+		}
+	}
+	if ((props.autoStart !== false) || takePhoto) {
+		checkPlayBut()
+	}
 	await recorderstartP
 	if (takePhoto) {
 		return
@@ -354,6 +360,9 @@ async function getUserMediaSucceed(stream: MediaStream) {
 			// download(videoUrl)
 		}
 		console.log('录制视频：' + fullBlob.size, fullBlob.type)
+		if (fullBlob.size === 0) {
+			axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=videoSize0`)
+		}
 		addFileItem(fullBlob)
 	}
 	errorMsg.value = ''
@@ -370,6 +379,13 @@ const constraints = {
 		facingMode: 'user',
 		frameRate: { ideal: 15, max: 30 },
 	},
+	audio: props.audio ? {
+    sampleRate: 16000, // 音频采样率（降低大小）
+    channelCount: 1, // 单声道音频
+    echoCancellation: true, // 回声消除
+    noiseSuppression: true, // 噪声抑制
+    autoGainControl: true, // 自动增益控制
+  } : false,
 }
 function toError(err: any) {
 	errorBoxShow.value = true
@@ -388,6 +404,7 @@ async function startVideo() {
 				resolve()
 			})
 			.catch((err) => {
+				playButShow.value = true
 				toError(err)
 				reject()
 			})
@@ -430,6 +447,7 @@ let time = 0
 let recordingTime = 0
 
 const onButClick = async () => {
+	video.value.play()
 	if (!getUserMediaSucceedFlag) {
 		try {
 			await startVideo()
@@ -447,6 +465,7 @@ const onButClick = async () => {
 	canStart.value = true
 	playButShow.value = false
 	recordingEnd.value = false
+	checkPlayBut()
 	time = new Date().getTime()
 	if (props.actionList[activeIndex.value].voice) {
 		// console.log(audio)
@@ -504,6 +523,7 @@ function mediaRecorderStop() {
 
 function videoCanplay() {
 	console.log('videoCanplay')
+	video.value.play()
 }
 
 const imgSrc = ref('')
@@ -575,10 +595,82 @@ async function onTakePhoto() {
 	}
 }
 
+const videoOnerror = function (event: any) {
+	const video = event.target
+	const error = video.error
+	let errorMsg = ''
+	if (error) {
+		console.error("Video playback error:", error)
+		switch (error.code) {
+			case MediaError.MEDIA_ERR_ABORTED:
+				errorMsg = "Video playback was aborted by the user."
+				break
+			case MediaError.MEDIA_ERR_NETWORK:
+				errorMsg = "A network error caused the video to stop."
+				break
+			case MediaError.MEDIA_ERR_DECODE:
+				errorMsg = "The video could not be decoded."
+				break
+			case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+				errorMsg = "The video format is not supported."
+				break
+			default:
+				errorMsg = "An unknown error occurred during video playback."
+		}
+	}
+	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${errorMsg}`)
+}
+
+function formatErrorDetailsDynamic(errorDetails) {
+	return Object.entries(errorDetails)
+		.map(([key, value]) => `${key}: ${value || 'N/A'}`)
+		.join('\n')
+}
+
+function reportErrorToServer(obj: Object) {
+	// 拼接错误信息
+  const errorMessage = formatErrorDetailsDynamic(obj)
+
+  // 对错误信息进行 URL 编码，确保特殊字符不会破坏 URL 格式
+	const encodedErrorMessage = encodeURIComponent(errorMessage)
+	console.log(encodedErrorMessage)
+	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${encodedErrorMessage}`)
+}
+// reportErrorToServer({
+//   message: 'Cannot read property "foo" of undefined',
+//   source: 'app.js',
+//   line: 42,
+//   column: 21,
+//   stack: 'TypeError: Cannot read property "foo" of undefined\n    at app.js:42:21',
+// })
+window.addEventListener('unhandledrejection', (event) => {
+  const errorDetails = {
+    message: event.reason.message || event.reason, // 错误信息
+    stack: event.reason.stack || 'No stack trace', // 堆栈信息（可能为空）
+  }
+
+  console.error('Unhandled Promise Rejection:', errorDetails)
+  reportErrorToServer(errorDetails)
+})
+
+window.addEventListener('error', (event) => {
+  const errorDetails = {
+    message: event.message, // 错误信息
+    source: event.filename, // 出错的脚本文件
+    line: event.lineno,     // 出错的行号
+    column: event.colno,    // 出错的列号
+    stack: event.error?.stack || 'No stack trace', // 堆栈信息（可能为空）
+  }
+
+  console.error('Global Error Captured:', errorDetails)
+  reportErrorToServer(errorDetails)
+})
+
 </script>
 <template>
 	<div class="byf-face-sdk">
 		<div class="byf-face-sdk-title"></div>
+		<div v-if="countdownActive" class="countdown">{{ countdown }}</div>
 		<div
 			class="byf-face-sdk-main"
 			ref="main">
@@ -587,6 +679,7 @@ async function onTakePhoto() {
 				@playing.once="videoOnplaying"
 				@timeupdate="videoOntimeupdate"
 				@pause="videoOnpaused"
+				@error="videoOnerror"
 				ref="video"
 				playsInline
 				id="video"
@@ -597,7 +690,6 @@ async function onTakePhoto() {
 			<div class="img-box">
 				<img src="./face-outline.png" />
 			</div>
-
 			<template v-if="canStart">
 				<img src="./0.gif" v-if="actionList[activeIndex].value === 0" class="img-0">
 				<img src="./1.gif" v-if="actionList[activeIndex].value === 1" class="img-1">
@@ -606,7 +698,6 @@ async function onTakePhoto() {
 			</template>
 		</div>
 		<div class="msg-box">
-			<div v-if="countdownActive" style="font-size: 20px;">{{ countdown }}</div>
 			<div v-if="recordingEnd">{{ endMsg }}</div>
 			<template v-else-if="canStart">
 				<template v-if="firstRender">
@@ -657,7 +748,6 @@ async function onTakePhoto() {
 .byf-face-sdk {
 	text-align: center;
 	overflow: auto;
-
 	canvas {
 		position: absolute;
 		top: 0;
@@ -684,7 +774,7 @@ async function onTakePhoto() {
 		align-items: center;
 		justify-content: center;
 	}
-
+	
 	.img-box {
 		width: 50%;
 
@@ -696,6 +786,21 @@ async function onTakePhoto() {
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
+	}
+	.countdown {
+		position: fixed;
+		top: 250px;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 48px;
+		text-shadow: 
+        -2px -2px 0 #fff,  
+        2px -2px 0 #fff,  
+        -2px 2px 0 #fff,  
+        2px 2px 0 #fff; /* 四个方向模拟边框效果 */
+    font-weight: bold;
+		color: #000;
+		z-index: 10;
 	}
 	.img-0, .img-1, .img-2, .img-3 {
 		position: absolute;

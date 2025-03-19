@@ -27,10 +27,10 @@ export interface ByfFaceSdkProps {
 	onGetUserMediaError: Function
 }
 
-import { onMounted, ref, nextTick, onBeforeUnmount, defineExpose } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick, onBeforeUnmount, defineExpose } from 'vue'
 import axios from 'axios'
 
-console.log('版本号:2025-01-17 01')
+console.log('版本号:2025-03-09 01')
 
 const video = ref()
 const playBut = ref()
@@ -122,8 +122,53 @@ if (!window.MediaRecorder) {
 // 如果自动开始
 const playButShow = ref(props.autoStart === false)
 
+function formatErrorDetailsDynamic(errorDetails) {
+	return Object.entries(errorDetails)
+		.map(([key, value]) => `${key}: ${value || 'N/A'}`)
+		.join('\n')
+}
+
+function reportErrorToServer(obj: Object) {
+	// 拼接错误信息
+  const errorMessage = formatErrorDetailsDynamic(obj)
+
+  // 对错误信息进行 URL 编码，确保特殊字符不会破坏 URL 格式
+	const encodedErrorMessage = encodeURIComponent(errorMessage)
+	console.log(encodedErrorMessage)
+	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${encodedErrorMessage}`)
+}
+
+const handleUnhandledRejection = (event) => {
+  const reason = event?.reason || {}
+	const errorDetails = {
+		message: reason.message || event?.reason, // 错误信息
+		stack: reason.stack || 'No stack trace', // 堆栈信息（可能为空）
+	}
+	console.error('Unhandled Promise Rejection:', errorDetails)
+	reportErrorToServer(errorDetails)
+}
+
+const handleError = (event) => {
+	const errorDetails = {
+		message: event.message, // 错误信息
+		source: event.filename, // 出错的脚本文件
+		line: event.lineno,     // 出错的行号
+		column: event.colno,    // 出错的列号
+		stack: event.error?.stack || 'No stack trace', // 堆栈信息（可能为空）
+	}
+	console.error('Global Error Captured:', errorDetails)
+	reportErrorToServer(errorDetails)
+}
+
 onMounted(async () => {
 	startVideo()
+	window.addEventListener('unhandledrejection', handleUnhandledRejection)
+	window.addEventListener('error', handleError)
+})
+
+onUnmounted(() => {
+	window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+	window.removeEventListener('error', handleError)
 })
 
 onBeforeUnmount(() => {
@@ -620,51 +665,6 @@ const videoOnerror = function (event: any) {
 	}
 	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${errorMsg}`)
 }
-
-function formatErrorDetailsDynamic(errorDetails) {
-	return Object.entries(errorDetails)
-		.map(([key, value]) => `${key}: ${value || 'N/A'}`)
-		.join('\n')
-}
-
-function reportErrorToServer(obj: Object) {
-	// 拼接错误信息
-  const errorMessage = formatErrorDetailsDynamic(obj)
-
-  // 对错误信息进行 URL 编码，确保特殊字符不会破坏 URL 格式
-	const encodedErrorMessage = encodeURIComponent(errorMessage)
-	console.log(encodedErrorMessage)
-	axios.get(`https://braininfra.ai/v1/api/err/trace?app_id=None&t=${encodedErrorMessage}`)
-}
-// reportErrorToServer({
-//   message: 'Cannot read property "foo" of undefined',
-//   source: 'app.js',
-//   line: 42,
-//   column: 21,
-//   stack: 'TypeError: Cannot read property "foo" of undefined\n    at app.js:42:21',
-// })
-window.addEventListener('unhandledrejection', (event) => {
-  const errorDetails = {
-    message: event.reason.message || event.reason, // 错误信息
-    stack: event.reason.stack || 'No stack trace', // 堆栈信息（可能为空）
-  }
-
-  console.error('Unhandled Promise Rejection:', errorDetails)
-  reportErrorToServer(errorDetails)
-})
-
-window.addEventListener('error', (event) => {
-  const errorDetails = {
-    message: event.message, // 错误信息
-    source: event.filename, // 出错的脚本文件
-    line: event.lineno,     // 出错的行号
-    column: event.colno,    // 出错的列号
-    stack: event.error?.stack || 'No stack trace', // 堆栈信息（可能为空）
-  }
-
-  console.error('Global Error Captured:', errorDetails)
-  reportErrorToServer(errorDetails)
-})
 
 </script>
 <template>

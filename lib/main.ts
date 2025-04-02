@@ -1,6 +1,8 @@
 // import faceapi from 'face-api.js'
 import { defineCustomElement, VueElement } from 'vue'
 import ByfFaceSdk, { ByfFaceSdkProps } from './ByfFaceSdk.ce.vue'
+
+window.ByfFaceSdk = ByfFaceSdk
 // 转换为自定义元素构造器
 const ByfFaceSdkElement = defineCustomElement(ByfFaceSdk)
 // 注册自定义元素
@@ -18,6 +20,7 @@ const byfFaceInit: ByfFaceInit = (box, props) => {
 	box.appendChild(element)
 	return element
 }
+
 export {
 	byfFaceInit,
 }

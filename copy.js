@@ -1,5 +1,4 @@
 import fs from 'fs'
-import path from 'path'
 
 const sourcePath = 'dist/byf-face-sdk.js' // 设置源文件路径
 const destinationPath = '../demo/byf-face-sdk.js' // 设置目标文件路径

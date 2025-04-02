@@ -49,7 +49,7 @@ const errorBoxShow = ref(false)
 const countdownActive = ref(false)
 const countdown = ref(3)
 let intervalId: any = null
-let frist = true // 页面首次录制
+let first = true // 页面首次录制
 
 const startCountdown = (callback) => {
   if (countdownActive.value) return
@@ -222,7 +222,7 @@ async function addFileItem(fullBlob: Blob) {
 	// console.log(activeIndex.value, props.actionList.length)
 	if (fileList.length === props.actionList.length) {
 		console.log('录制结束')
-		frist = false
+		first = false
 		canStart.value = false
 		// canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
 		warningMsg.value = ''
@@ -371,7 +371,7 @@ async function getUserMediaSucceed(stream: MediaStream) {
 		video.value.play()
 		console.log('video.value.onloadedmetadata')
 		if (props.autoStart !== false) {
-			if (typeof props.autoStart === 'number' && props.autoStart && frist) {
+			if (typeof props.autoStart === 'number' && props.autoStart && first) {
 				startCountdown(onButClick)
 			} else {
 				onButClick()
